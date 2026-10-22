@@ -11,7 +11,7 @@ You cannot horizontal-scale a 4-GPU tensor-parallel service on a single 4-GPU no
 
 == Click path
 
-. Delete the 2-GPU 24B **InferenceService** (or stop it). Keep the Model Registry entries.
+. Delete the 2-GPU Phi-4 **InferenceService** (or stop it). Keep the Model Registry entries.
 . **AI hub → Registry** → **workshop** → the Ministral (or Qwen) version from C3/C4 → ⋮ → **Deploy** onto *NVIDIA L4 - 1 GPU*. Do not go back to the catalog **Deploy** button.
 . Set min replicas 1 and max replicas 2 (dashboard deployment / scaling fields).
 . Show two pods, two GPUs.
@@ -20,7 +20,7 @@ Optional: try a third replica and watch it **queue** in Kueue or stay Pending (o
 
 == After scale-out
 
-Class day is **not** a second 4-L4 node. `./setup/scale-students.sh` (C7 capacity) keeps the presenter `g2-standard-48` and adds three `g2-standard-24`. That is six extra L4s for playground slots, not "the 24B is now sharded across nodes."
+Class day is **not** a second 4-L4 node. `./setup/scale-students.sh` (C7 capacity) keeps the presenter `g2-standard-48` and adds three `g2-standard-24`. That is six extra L4s for playground slots, not "the 2-GPU replica is now sharded across nodes."
 
 Independent pools:
 

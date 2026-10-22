@@ -16,9 +16,36 @@ Your Ministral (or other) deployment in **your** project must have:
 
 `--max-model-len=8192` fails as soon as you enable OpenShift MCP tools. Playground injects the tool schemas (~12k input tokens) and requests 4096 output tokens. Edit the InferenceService arguments if you deployed P1 with 8192, wait until the predictor is Ready, then retry.
 
+== Model type
+
+When you create or update a playground model, **Type** is which API the playground should call. It is not the KServe serving runtime.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/configuring-a-playground-for-your-project_rhoai-user[Configure a playground]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/create-and-use-custom-endpoints-in-the-playground_rhoai-user[Create and use custom endpoints]
+
+[cols="1,2,2"]
+|===
+| Type | What it is | This lab
+
+| **Inference**
+| Conversation model. Text generation / chat completions. MCP tools run against this model.
+| **Leave this.** Ministral (and Phi-4 / Qwen / Granite) are Inference. Deploy-time **Add as AI asset endpoint** with use case `chat` maps here.
+
+| **Embedding**
+| Turns text into vectors for the **Knowledge** tab (RAG). A separate embedder, not the chat LLM.
+| Not deployed. Do not set Ministral to Embedding.
+
+| **Transcription**
+| Automatic speech recognition. Audio is transcribed first, then the text goes to the Inference model. Needs `/v1/audio/transcriptions`.
+| Not deployed. Do not set Ministral to Transcription.
+|===
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/playground-prerequisites_rhoai-user[Playground prerequisites (ASR)]
+
 == Exercise
 
-. Open **Gen AI studio → Playground**. Select **your** model.
+. Open **Gen AI studio → Playground**. Select **your** model. Type **Inference**.
 . Enable **openshift-mcp-server**. It is read-only (ClusterRole `view`). Do not ask it to create, patch, or delete anything.
 . Prompt:
 

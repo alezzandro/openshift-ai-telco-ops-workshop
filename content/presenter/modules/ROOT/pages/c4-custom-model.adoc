@@ -35,7 +35,7 @@ If Ministral from C3 is still running you now occupy **two** GPUs. That is fine 
 
 . Open the **S4 demo object storage** URL in the presenter banner. Log in with the S4 UI user from `./setup/show-credentials.sh`.
 . **Storage Management** — bucket `models`.
-. **Storage Browser** — prefix `qwen2.5-7b-instruct/` (config.json, safetensors, tokenizer). Setup pulled this with S4's **Import from HuggingFace** (or the seed Job). Do **not** start a second 15 GB import on stage.
+. **Storage Browser** — prefix `qwen2.5-7b-instruct/` (config.json, safetensors, tokenizer only). Setup pulled this with S4's **Import from HuggingFace** (or the seed Job) and stripped Hugging Face `.cache` keys — KServe downloads every object under the path. Do **not** start a second 15 GB import on stage.
 . Point at **Import from HuggingFace**: model ID + destination bucket/prefix. That is the click you would use for the *next* model. Large imports belong in setup, not in the 12-minute slot.
 
 Talking point: "In a customer environment this UI is the bucket console on OpenShift Data Foundation or the cloud S3 console. S4 exists so this cluster does not depend on a cloud account's object store."
@@ -69,5 +69,7 @@ https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/h
 == Test with curl
 
 Point `MODEL_URL` at the new Route and reuse `workshop-infer` (same pattern as C3). Ask the same prompt on Ministral and Qwen. Ops talking point: pack vs quality, not "pick a winner".
+
+If Ministral and Phi-4 are both still running, delete this Qwen InferenceService before xref:c4b-modelcar.adoc[C4b] so Granite can take the last L4. Keep the registry version.
 
 Next: xref:c4b-modelcar.adoc[C4b. Package a Hugging Face model as a ModelCar] (skip on a 60-minute cut).

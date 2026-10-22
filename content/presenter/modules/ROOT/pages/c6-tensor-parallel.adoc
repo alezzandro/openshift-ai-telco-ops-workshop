@@ -14,9 +14,13 @@ https://docs.redhat.com/en/documentation/red_hat_ai_inference/3.5/html/vllm_serv
 
 == Model
 
-* Mistral Small 3.1 24B Instruct FP8-dynamic
-* Min vRAM about 29.7 GB — validated **2 × L4**
+* **Phi-4** (Microsoft, 14B, BF16) — catalog ModelCar
+* Min vRAM about 33.8 GB — validated **2 × L4**. It does **not** fit one 24 GB L4, so the hardware profile is two GPUs, not one.
 * `--tensor-parallel-size=2`
+
+https://docs.redhat.com/en/documentation/red_hat_ai/3/html/validated_models/model-support-matrix_validated-models[Red Hat AI model support matrix]
+
+Do **not** pick Phi-4-mini, Phi-4 FP8-dynamic, or Phi-4 w8a8. Those cards fit a single L4 and skip the tensor-parallel lesson.
 
 == Honesty (PCIe)
 
@@ -25,23 +29,34 @@ NVIDIA L4 on G2 (`g2-standard-48` / `g2-standard-24`) has **no NVLink**. Tensor 
 == Click path (register, then deploy)
 
 . Stop or delete the previous large InferenceService so two GPUs are free. Leave the Ministral / Qwen **registry entries**; you are only freeing GPUs.
-. **Register** the 24B FP8 as a version in Model Registry **workshop** (same path as C3/C4):
-** Prefer **AI hub → Models → Catalog** → search *Mistral Small 3.1 24B* → **Register model** into **workshop**, version `1.5-fp8`.
+. **Register** Phi-4 as a version in Model Registry **workshop** (same path as C3/C4):
+** Prefer **AI hub → Models → Catalog** → search *Phi-4* → open the 14B BF16 card (min vRAM ~33.8 GB) → **Register model** into **workshop**, version `1.5`.
 ** If the card is missing: **AI hub → Registry** → **Register model**, URI
 +
-`oci://registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503-fp8-dynamic:1.5`
+`oci://registry.redhat.io/rhelai1/modelcar-phi-4:1.5`
 +
 Format `vLLM`. Do **not** use *Register and store*.
 . Open the registered version → ⋮ → **Deploy** into `{presenter_project}`.
+. Connection **Red Hat catalog ModelCars** autoselects and may look locked. Leave it. Matching is by OCI host `registry.redhat.io`, not by model name; the Phi-4 URI is on this registry version. You are not redeploying Ministral.
 . Hardware profile: *NVIDIA L4 - 2 GPU tensor parallel*.
 . Additional serving arguments: `--tensor-parallel-size=2` and `--max-model-len=8192`.
 . GPU count in the form must match the tensor parallel size.
-. Advanced settings: **Model access**, **Require token authentication** (`workshop-infer`).
+. Advanced settings: **Add as AI asset endpoint** (use case `chat`), **Model access**, **Require token authentication** (`workshop-infer`).
 . Wait Ready. In OpenShift AI **Observe & monitor → Infrastructure**, two GPUs show memory.
 
 == Test with curl
 
-On deploy, keep **Model access** and **Require token authentication** (`workshop-infer`). Re-point `MODEL_URL` at the new Route and send the same chat payload as C3.
+On deploy, keep **Model access** and **Require token authentication** (`workshop-infer`). Re-point `MODEL_URL` at the new Route. Success for C6 is `/v1/models` **200**, two L4s in metrics, and a temperature-0 chat completion that answers in English:
+
+----
+curl -sk -H "Authorization: Bearer ${TOKEN}" "${MODEL_URL}/v1/models"
+
+curl -sk -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+  "${MODEL_URL}/v1/chat/completions" \
+  -d '{"model":"phi-4","messages":[{"role":"user","content":"Reply with exactly the word PONG."}],"max_tokens":16,"temperature":0}'
+----
+
+This is the Playground-quality 2-GPU path. Leave it running if you will chat from **Gen AI studio → Playground**; otherwise delete it before C7 so two GPUs are free.
 
 == Do not deploy
 

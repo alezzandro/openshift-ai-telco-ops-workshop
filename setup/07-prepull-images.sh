@@ -23,7 +23,7 @@ echo ""
 VLLM_IMAGE="$(detect_vllm_image)"
 export VLLM_IMAGE OPEN_WEBUI_IMAGE
 export MODELCAR_MINISTRAL_14B MODELCAR_QWEN_7B MODELCAR_QWEN_7B_W4A16
-export MODELCAR_MISTRAL_24B_FP8 MODELCAR_MISTRAL_24B
+export MODELCAR_PHI_4 MODELCAR_MISTRAL_24B
 echo "  vLLM image: ${VLLM_IMAGE}"
 echo "  Open WebUI image: ${OPEN_WEBUI_IMAGE}"
 
@@ -41,7 +41,7 @@ images = [
     os.environ["MODELCAR_MINISTRAL_14B"],
     os.environ["MODELCAR_QWEN_7B"],
     os.environ["MODELCAR_QWEN_7B_W4A16"],
-    os.environ["MODELCAR_MISTRAL_24B_FP8"],
+    os.environ["MODELCAR_PHI_4"],
     os.environ["MODELCAR_MISTRAL_24B"],
 ]
 out = []
@@ -86,7 +86,13 @@ doc = {
   },
   "spec": {
     "selector": {"matchLabels": {"app": name}},
-    "updateStrategy": {"type": "RollingUpdate"},
+    # 100% unavailable: ModelCar images often lack /bin/true, so inits never
+    # go Ready. Rolling one node at a time would strand the other GPU nodes
+    # on the previous image list.
+    "updateStrategy": {
+      "type": "RollingUpdate",
+      "rollingUpdate": {"maxUnavailable": "100%", "maxSurge": 0},
+    },
     "template": {
       "metadata": {"labels": {"app": name}},
       "spec": {
@@ -143,24 +149,44 @@ apply_puller \
 
 puller_images_cached() {
   local app="$1"
-  oc get pods -n workshop-prepull -l "app=${app}" -o json 2>/dev/null | python3 -c '
-import json, sys
-data = json.load(sys.stdin)
-items = data.get("items") or []
-if not items:
+  python3 - "${app}" <<'PY'
+import json, subprocess, sys
+app = sys.argv[1]
+try:
+    ds = json.loads(subprocess.check_output(
+        ["oc", "get", "ds", app, "-n", "workshop-prepull", "-o", "json"],
+        stderr=subprocess.DEVNULL,
+    ))
+    pods = json.loads(subprocess.check_output(
+        ["oc", "get", "pods", "-n", "workshop-prepull", "-l", f"app={app}", "-o", "json"],
+        stderr=subprocess.DEVNULL,
+    ))
+except subprocess.CalledProcessError:
+    sys.exit(1)
+want = [c["image"] for c in ds["spec"]["template"]["spec"].get("initContainers") or []]
+if not want:
+    sys.exit(1)
+items = [p for p in (pods.get("items") or []) if p.get("metadata", {}).get("deletionTimestamp") is None]
+desired = (ds.get("status") or {}).get("desiredNumberScheduled") or 0
+if not items or (desired and len(items) < int(desired)):
     sys.exit(1)
 for pod in items:
-    inits = pod.get("status", {}).get("initContainerStatuses") or []
-    if not inits:
+    spec_imgs = [c["image"] for c in pod.get("spec", {}).get("initContainers") or []]
+    if spec_imgs != want:
         sys.exit(1)
-    for st in inits:
+    statuses = pod.get("status", {}).get("initContainerStatuses") or []
+    by_name = {s.get("name"): s for s in statuses}
+    for spec in pod.get("spec", {}).get("initContainers") or []:
+        st = by_name.get(spec["name"])
+        if not st:
+            sys.exit(1)
         waiting = (st.get("state") or {}).get("waiting") or {}
         if waiting.get("reason") in ("ErrImagePull", "ImagePullBackOff"):
             sys.exit(1)
         if not st.get("imageID"):
             sys.exit(1)
 sys.exit(0)
-'
+PY
 }
 
 echo ""

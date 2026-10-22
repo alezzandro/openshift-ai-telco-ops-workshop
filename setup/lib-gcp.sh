@@ -6,6 +6,12 @@ workshop_repo_root() {
 }
 
 workshop_cluster_dir() {
+  # IPI artifacts live in ./cluster (gitignored). CLUSTER_DIR overrides that
+  # path for destroy/overnight if you point at a different install-dir.
+  if [ -n "${CLUSTER_DIR:-}" ]; then
+    echo "${CLUSTER_DIR}"
+    return 0
+  fi
   echo "$(workshop_repo_root)/cluster"
 }
 
@@ -127,7 +133,13 @@ PY
   rm -f "${parsed}"
   eval "${old_xtrace}"
 
-  if [ -n "${preset_domain}" ]; then
+  # Project always comes from the credentials file so a previous tenant
+  # left in the shell cannot install into the wrong GCP project.
+  if [ -n "${preset_project}" ] && [ "${preset_project}" != "${GCP_PROJECT}" ]; then
+    echo "  [WARN] ignoring stale GCP_PROJECT=${preset_project}; using credentials file ${GCP_PROJECT}" >&2
+  fi
+  if [ -n "${preset_domain}" ] && [ "${preset_domain}" != "${GCP_BASE_DOMAIN:-}" ]; then
+    echo "  [WARN] GCP_BASE_DOMAIN env (${preset_domain}) overrides credentials file (${GCP_BASE_DOMAIN:-})" >&2
     export GCP_BASE_DOMAIN="${preset_domain#.}"
     GCP_BASE_DOMAIN="${GCP_BASE_DOMAIN%.}"
     export GCP_BASE_DOMAIN
@@ -135,9 +147,6 @@ PY
     GCP_BASE_DOMAIN="${GCP_BASE_DOMAIN#.}"
     GCP_BASE_DOMAIN="${GCP_BASE_DOMAIN%.}"
     export GCP_BASE_DOMAIN
-  fi
-  if [ -n "${preset_project}" ]; then
-    export GCP_PROJECT="${preset_project}"
   fi
   if [ -n "${preset_email}" ]; then
     export GCP_ACME_EMAIL="${preset_email}"
@@ -148,6 +157,7 @@ PY
     return 1
   fi
   export CLOUDSDK_CORE_PROJECT="${GCP_PROJECT}"
+  export CLOUDSDK_CORE_ACCOUNT="${GCP_SA_EMAIL}"
   export CLOUDSDK_CORE_DISABLE_PROMPTS=1
   export GCE_PROJECT="${GCP_PROJECT}"
 }
@@ -176,6 +186,9 @@ gcp_activate() {
     echo "  ERROR: GOOGLE_APPLICATION_CREDENTIALS is missing. Run load_gcp_credentials first." >&2
     return 1
   fi
+  export CLOUDSDK_CORE_PROJECT="${GCP_PROJECT}"
+  export CLOUDSDK_CORE_ACCOUNT="${GCP_SA_EMAIL}"
+  export GCE_PROJECT="${GCP_PROJECT}"
   gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}" --quiet >/dev/null
   gcloud config set project "${GCP_PROJECT}" --quiet >/dev/null
   gcloud config set compute/region "${GCP_REGION}" --quiet >/dev/null

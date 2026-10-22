@@ -20,9 +20,39 @@ The OpenShift MCP server in `{presenter_project}` is **read-only** (`core` + `co
 
 . OpenShift AI → **Gen AI studio → Playground**.
 . Select the Ministral deployment from C3 (it is listed because you checked **Add as AI asset endpoint**).
+. If **Configure playground** or **Update model** asks for **Type**, leave **Inference**. That is the conversation model. Do not pick Embedding or Transcription for Ministral.
 . Confirm the playground instance is Ready. Setup does **not** pre-create this; the first open from the dashboard creates an `OGXServer` (`ogx.io`) in `{presenter_project}`.
 
 Required phrases: "Gen AI playground is Technology Preview." "OGX operator, not LlamaStack."
+
+== Model type (Inference / Embedding / Transcription)
+
+The Type dropdown on **Gen AI studio → Playground** (and on **AI asset endpoints** when you create or update a custom endpoint) is **not** the KServe serving runtime. It tells the playground which API to call.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/configuring-a-playground-for-your-project_rhoai-user[Configure a playground]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/create-and-use-custom-endpoints-in-the-playground_rhoai-user[Create and use custom endpoints]
+
+[cols="1,2,2"]
+|===
+| Type | What it is | This lab
+
+| **Inference** (inferencing / conversation)
+| Text in, text out. Chat Completions (`/v1/chat/completions`). The model in the chat panel and for MCP tool calls.
+| **Ministral, Qwen, Granite, Phi-4.** Deploy-time **Add as AI asset endpoint** with use case `chat` maps here. Leave this selected.
+
+| **Embedding**
+| Text in, vector out. Used by the **Knowledge** tab for RAG (chunk → embed → retrieve). A different model than the chat LLM.
+| Not deployed. Do not mark Ministral as Embedding — chat and MCP will not work.
+
+| **Transcription**
+| Audio in, text out (ASR). Playground transcribes the upload, then sends that text to the Inference model. Needs an OpenAI-compatible `/v1/audio/transcriptions` API (`audio-transcription` capability).
+| Not deployed (no Whisper-class ASR). MaaS models cannot be ASR endpoints.
+|===
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/playground-prerequisites_rhoai-user[Playground prerequisites (ASR)]
+
+Talking point: one playground session can attach *three different services* — chat LLM, embedder, ASR — the same way a production RAG+voice app does. This cluster only has the chat LLM.
 
 == 2. Enable OpenShift MCP tools
 

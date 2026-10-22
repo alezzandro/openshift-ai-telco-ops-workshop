@@ -38,6 +38,14 @@ spec:
         - name: s4
           image: quay.io/rh-aiservices-bu/s4:0.3.2-2
           imagePullPolicy: IfNotPresent
+          # CRI-O default soft nofile is 1024. KServe storage-initializer
+          # HeadObject/GetObject of Qwen shards exhausts that; Ceph RGW then
+          # returns HTTP 500 (EMFILE). Wrap the image entrypoint (ceph init +
+          # supervisord); do not exec supervisord directly or radosgw SIGABRTs.
+          command:
+            - /usr/bin/python3
+            - -c
+            - import os, resource; h = resource.getrlimit(resource.RLIMIT_NOFILE)[1]; resource.setrlimit(resource.RLIMIT_NOFILE, (h, h)); os.execv("/opt/ceph-container/bin/entrypoint.sh", ["/opt/ceph-container/bin/entrypoint.sh"])
           ports:
             - name: s3-api
               containerPort: 7480

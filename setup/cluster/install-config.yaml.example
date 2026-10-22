@@ -1,7 +1,7 @@
 # Example only. setup/01-install-cluster.sh writes the real file (with pull
 # secret and SSH key) to ./cluster/install-config.yaml, which is gitignored.
 apiVersion: v1
-baseDomain: vfq4m.gcp.redhatworkshops.io
+baseDomain: <guid>.gcp.redhatworkshops.io
 credentialsMode: Passthrough
 metadata:
   name: ocp
@@ -38,7 +38,7 @@ networking:
   - 172.30.0.0/16
 platform:
   gcp:
-    projectID: openenv-vfq4m
+    projectID: openenv-<guid>
     region: asia-southeast1
 publish: External
 pullSecret: '{"auths":{}}'

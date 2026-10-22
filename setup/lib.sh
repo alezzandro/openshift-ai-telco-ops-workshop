@@ -771,3 +771,203 @@ PY
     done < <(oc get ogxserver -n "${ns}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
   done
 }
+
+# Shared OCI-v1 connection for catalog ModelCars (C3 Ministral, C6 Phi-4, …).
+# Matching is by OCI_HOST (registry.redhat.io), not by model name. C3 used to
+# create a connection named after Ministral; C6 then locked that leftover in
+# the deploy dropdown. Prefer one well-named connection per Data Science Project.
+ensure_redhat_catalog_oci_connections() {
+  local ns
+  for ns in ${DS_PROJECTS}; do
+    CATALOG_OCI_CONNECTION_NAME="${CATALOG_OCI_CONNECTION_NAME}" \
+    CATALOG_OCI_CONNECTION_DISPLAY="${CATALOG_OCI_CONNECTION_DISPLAY}" \
+    CATALOG_OCI_HOST="${CATALOG_OCI_HOST}" \
+    NS="${ns}" python3 - <<'PY' | oc apply -f -
+import base64, json, os, subprocess, sys
+
+ns = os.environ["NS"]
+want_name = os.environ["CATALOG_OCI_CONNECTION_NAME"]
+display = os.environ["CATALOG_OCI_CONNECTION_DISPLAY"]
+host = os.environ["CATALOG_OCI_HOST"]
+desc = (
+    "OCI pull host for catalog ModelCars on registry.redhat.io. "
+    "Shared by every catalog model (Ministral, Phi-4, and others). "
+    "The Model Registry version names the image; this connection is not the model."
+)
+
+def decode(data, key):
+    raw = (data or {}).get(key)
+    if not raw:
+        return ""
+    return base64.b64decode(raw).decode()
+
+secrets = json.loads(subprocess.check_output(["oc", "get", "secrets", "-n", ns, "-o", "json"]))
+existing = []
+for secret in secrets.get("items") or []:
+    ann = secret.get("metadata", {}).get("annotations") or {}
+    if ann.get("opendatahub.io/connection-type-ref") != "oci-v1":
+        continue
+    if decode(secret.get("data"), "OCI_HOST") != host:
+        continue
+    existing.append(secret["metadata"]["name"])
+
+name = existing[0] if existing else want_name
+doc = {
+    "apiVersion": "v1",
+    "kind": "Secret",
+    "metadata": {
+        "name": name,
+        "namespace": ns,
+        "labels": {"opendatahub.io/dashboard": "true"},
+        "annotations": {
+            "opendatahub.io/connection-type-protocol": "oci",
+            "opendatahub.io/connection-type-ref": "oci-v1",
+            "openshift.io/display-name": display,
+            "openshift.io/description": desc,
+        },
+    },
+    "type": "Opaque",
+    "stringData": {
+        "ACCESS_TYPE": '["Pull"]',
+        "OCI_HOST": host,
+    },
+}
+print(json.dumps(doc, indent=2))
+if existing and name != want_name:
+    print(f"  [OK] {ns}/{name} (renamed leftover catalog OCI connection)", file=sys.stderr)
+else:
+    print(f"  [OK] {ns}/{name}", file=sys.stderr)
+PY
+  done
+}
+
+# OCI connection for ImageStream ModelCars (C4b Granite). KServe pulls
+# oci://image-registry.openshift-image-registry.svc:5000/... and the
+# operator injects spec.predictor.imagePullSecrets from this Secret.
+# Type must be kubernetes.io/dockerconfigjson with an "auths" map.
+# Uploading the default SA's raw .dockercfg (no auths wrapper) yields
+# "authentication required". One connection per host — extras lock the
+# deploy dropdown on a leftover Granite-named secret.
+ensure_incluster_registry_oci_connections() {
+  local ns
+  for ns in ${DS_PROJECTS}; do
+    INCLUSTER_OCI_CONNECTION_NAME="${INCLUSTER_OCI_CONNECTION_NAME}" \
+    INCLUSTER_OCI_CONNECTION_DISPLAY="${INCLUSTER_OCI_CONNECTION_DISPLAY}" \
+    INCLUSTER_OCI_HOST="${INCLUSTER_OCI_HOST}" \
+    NS="${ns}" python3 - <<'PY'
+import base64, json, os, subprocess, sys
+
+ns = os.environ["NS"]
+want_name = os.environ["INCLUSTER_OCI_CONNECTION_NAME"]
+display = os.environ["INCLUSTER_OCI_CONNECTION_DISPLAY"]
+host = os.environ["INCLUSTER_OCI_HOST"]
+desc = (
+    "OCI pull host for ModelCars in the in-cluster image registry. "
+    "Requires kubernetes.io/dockerconfigjson (auths wrapper). "
+    "Shared by every image-registry.openshift-image-registry.svc ModelCar."
+)
+want_type = "kubernetes.io/dockerconfigjson"
+
+def oc_json(*args):
+    return json.loads(subprocess.check_output(["oc", *args]))
+
+def oc_run(*args, check=True):
+    return subprocess.run(["oc", *args], check=check, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+def decode(data, key):
+    raw = (data or {}).get(key)
+    if not raw:
+        return ""
+    return base64.b64decode(raw).decode()
+
+def default_sa_auths(namespace):
+    sa = oc_json("get", "sa", "default", "-n", namespace, "-o", "json")
+    auths = {}
+    for ref in sa.get("imagePullSecrets") or []:
+        name = ref.get("name")
+        if not name:
+            continue
+        sec = oc_json("get", "secret", name, "-n", namespace, "-o", "json")
+        data = sec.get("data") or {}
+        if ".dockerconfigjson" in data:
+            cfg = json.loads(base64.b64decode(data[".dockerconfigjson"]))
+            if isinstance(cfg.get("auths"), dict):
+                auths.update(cfg["auths"])
+            elif isinstance(cfg, dict):
+                # Mis-uploaded legacy dockercfg stored in the dockerconfigjson key.
+                auths.update({k: v for k, v in cfg.items() if k != "auths" and isinstance(v, dict)})
+        if ".dockercfg" in data:
+            cfg = json.loads(base64.b64decode(data[".dockercfg"]))
+            if isinstance(cfg, dict):
+                auths.update(cfg)
+    return auths
+
+def is_incluster_oci(secret):
+    ann = secret.get("metadata", {}).get("annotations") or {}
+    protocol = ann.get("opendatahub.io/connection-type-protocol")
+    ref = ann.get("opendatahub.io/connection-type-ref")
+    if protocol != "oci" and ref != "oci-v1":
+        return False
+    got = decode(secret.get("data"), "OCI_HOST")
+    return "image-registry.openshift-image-registry.svc" in got
+
+def apply_secret(doc):
+    proc = subprocess.run(
+        ["oc", "apply", "-f", "-"],
+        input=json.dumps(doc).encode(),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr.decode() or "oc apply failed\n")
+        sys.exit(proc.returncode)
+
+auths = default_sa_auths(ns)
+if not auths:
+    print(f"  [WARN] {ns}: default SA has no image pull auths; skip in-cluster OCI connection", file=sys.stderr)
+    sys.exit(0)
+if host not in auths:
+    print(f"  [WARN] {ns}: default SA auths missing {host}", file=sys.stderr)
+
+dockerconfigjson = json.dumps({"auths": auths}, separators=(",", ":"))
+doc = {
+    "apiVersion": "v1",
+    "kind": "Secret",
+    "metadata": {
+        "name": want_name,
+        "namespace": ns,
+        "labels": {"opendatahub.io/dashboard": "true"},
+        "annotations": {
+            "opendatahub.io/connection-type-protocol": "oci",
+            "opendatahub.io/connection-type-ref": "oci-v1",
+            "openshift.io/display-name": display,
+            "openshift.io/description": desc,
+        },
+    },
+    "type": want_type,
+    "stringData": {
+        "ACCESS_TYPE": '["Pull"]',
+        "OCI_HOST": host,
+        ".dockerconfigjson": dockerconfigjson,
+    },
+}
+
+secrets = oc_json("get", "secrets", "-n", ns, "-o", "json")
+existing = [s for s in secrets.get("items") or [] if is_incluster_oci(s)]
+canonical = next((s for s in existing if s["metadata"]["name"] == want_name), None)
+if canonical and canonical.get("type") != want_type:
+    oc_run("delete", "secret", want_name, "-n", ns, "--ignore-not-found=true")
+
+apply_secret(doc)
+
+for secret in existing:
+    extra = secret["metadata"]["name"]
+    if extra == want_name:
+        continue
+    oc_run("delete", "secret", extra, "-n", ns, "--ignore-not-found=true")
+    print(f"  [OK] {ns}: removed leftover OCI connection {extra}", file=sys.stderr)
+
+print(f"  [OK] {ns}/{want_name} ({display})", file=sys.stderr)
+PY
+  done
+}

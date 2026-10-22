@@ -34,7 +34,15 @@ else
 fi
 echo ""
 
-echo "5. Red Hat build of Kueue..."
+echo "5. Cluster Observability Operator (OpenShift AI Observe & monitor)..."
+apply_operator_manifest "${MANIFESTS_DIR}/coo-subscription.yaml"
+echo ""
+
+echo "6. Red Hat build of OpenTelemetry (DSCI metrics collector)..."
+apply_operator_manifest "${MANIFESTS_DIR}/opentelemetry-subscription.yaml"
+echo ""
+
+echo "7. Red Hat build of Kueue..."
 KUEUE_CHANNEL="$(packagemanifest_default_channel kueue-operator)"
 if [ -z "${KUEUE_CHANNEL}" ]; then
   KUEUE_CHANNEL="stable-v1.4"
@@ -52,6 +60,8 @@ wait_for_csv "openshift-nfd" "nfd" 300 || true
 wait_for_csv "nvidia-gpu-operator" "gpu-operator" 300 || true
 wait_for_csv "redhat-ods-operator" "rhods-operator" 420 || true
 wait_for_csv "cert-manager-operator" "cert-manager" 300 || true
+wait_for_csv "openshift-cluster-observability-operator" "cluster-observability-operator" 300 || true
+wait_for_csv "openshift-opentelemetry-operator" "opentelemetry-operator" 300 || true
 wait_for_csv "openshift-kueue-operator" "kueue-operator" 300 || true
 
 echo ""

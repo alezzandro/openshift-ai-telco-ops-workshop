@@ -29,13 +29,45 @@ One GPU pool, two application teams. Same idea as a shared device pool with quot
 | External Route requires a bearer token with `get` on InferenceServices in *that* project
 |===
 
+== Where the 2 GPU cap is set
+
+The tenant GPU cap is an **OpenShift** `ResourceQuota` on the Data Science Project namespace. OpenShift AI does **not** have a separate dashboard form that replaces that object. What you *do* configure in OpenShift AI is how a *single* workload asks for GPUs, and how the *pool* admits work.
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/quotas[Resource quotas (OpenShift 4.22)]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_accelerators/working-with-hardware-profiles_accelerators[Hardware profiles]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-workloads-with-kueue[Manage workloads with Kueue]
+
+[cols="1,1,2,2"]
+|===
+| Layer | Object | What it does | Where you set it
+
+| **OpenShift**
+| `ResourceQuota` `gpu-quota`
+| Hard cap: `{ran_project}` and `{core_project}` cannot request more than **2** `nvidia.com/gpu` in total. The API returns **Forbidden** (`exceeded quota`) if a third GPU would start. `{presenter_project}` has no GPU ResourceQuota — the presenter shares the Kueue pools.
+| OpenShift console → **Administration → ResourceQuotas**, or `oc describe resourcequota gpu-quota -n {ran_project}`. Setup applies `manifests/projects/resourcequotas.yaml`. **Not** Settings in OpenShift AI.
+
+| **OpenShift AI**
+| Hardware profile
+| How many GPUs *this* deploy requests (1 / 2 / 4) and the min/max a user may pick on that profile. Two 1-GPU deploys still consume two GPUs. A profile maximum of 1 does **not** stop a second model.
+| OpenShift AI → **Settings → Environment setup → Hardware profiles**
+
+| **OpenShift AI / Kueue**
+| `ClusterQueue` `nominalQuota`
+| Fair-share admission for the **cluster GPU pool**. Excess work stays **SchedulingGated** / queued instead of stealing another team's cards. That is pool quota, not the tenant 2 GPU hard cap.
+| `ClusterQueue` / `LocalQueue` (this lab: setup). OpenShift AI can auto-create queues when `autoCreateQueues: true`; this lab manages them in Git.
+|===
+
+Talking point: Hardware profile answers "how big is this serving pod?" ResourceQuota answers "how many GPUs may this team consume?" Kueue answers "is there room in the shared pool right now?" You need all three. NVIDIA L4 has no MIG, so isolation is a whole GPU.
+
 == Click path
 
 . In OpenShift AI, switch to `{ran_project}` (or impersonate a bound user).
 . **AI hub → Registry** → **workshop** → the Ministral version from C3 → ⋮ → **Deploy** into `{ran_project}` on *NVIDIA L4 - 1 GPU*. Same registered artifact, different project — that is the tenancy story. Do not deploy from the catalog card.
 . Advanced settings: **Model access**, **Require token authentication**, service account `workshop-infer`.
 . From a laptop, curl the **ran** Route with a `workshop-infer` token minted in `{ran_project}`. Then curl the **presenter** Route with that same token — expect **401**. Isolation is the Data Science Project plus token auth, not Open WebUI.
-. Try a third 1-GPU deploy while four GPUs are busy — it should **queue** or hit quota, not silently steal the presenter's cards.
+. Try a third 1-GPU deploy in `{ran_project}` after that tenant already holds 2 GPUs — expect **Forbidden** (`exceeded quota: gpu-quota`). If the *pool* is full instead, Kueue leaves the workload **SchedulingGated**. Neither path silently steals the presenter's cards.
 
 Talking points:
 

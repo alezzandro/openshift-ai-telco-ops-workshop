@@ -127,6 +127,8 @@ for ns in ${DS_PROJECTS}; do
   oc adm policy add-role-to-group system:image-puller "system:serviceaccounts:${ns}" \
     -n "${PRESENTER_PROJECT}" >/dev/null 2>&1 || true
 done
+echo "  In-cluster registry OCI connections (dockerconfigjson pull secret)..."
+ensure_incluster_registry_oci_connections
 EXISTING_IS="$(oc get istag "${HF_C4B_IS}:${HF_C4B_TAG}" -n "${PRESENTER_PROJECT}" \
   -o jsonpath='{.image.dockerImageReference}' 2>/dev/null || true)"
 if [ -n "${EXISTING_IS}" ]; then
@@ -177,10 +179,14 @@ doc = {
             {"name": "S4_BUCKET", "value": os.environ["S4_BUCKET"]},
             {"name": "HF_REPO_ID", "value": os.environ["HF_C4_REPO"]},
             {"name": "S3_PREFIX", "value": os.environ["HF_C4_PREFIX"]},
-            {"name": "S4_UI_USER", "value": os.environ["S4_UI_USER"]},
-            {"name": "S4_UI_PASSWORD", "value": os.environ["S4_UI_PASS"]},
-            {"name": "AWS_ACCESS_KEY_ID", "value": os.environ["S4_ACCESS"]},
-            {"name": "AWS_SECRET_ACCESS_KEY", "value": os.environ["S4_SECRET"]},
+            {"name": "S4_UI_USER",
+             "valueFrom": {"secretKeyRef": {"name": "s4-credentials", "key": "UI_USERNAME"}}},
+            {"name": "S4_UI_PASSWORD",
+             "valueFrom": {"secretKeyRef": {"name": "s4-credentials", "key": "UI_PASSWORD"}}},
+            {"name": "AWS_ACCESS_KEY_ID",
+             "valueFrom": {"secretKeyRef": {"name": "s4-credentials", "key": "AWS_ACCESS_KEY_ID"}}},
+            {"name": "AWS_SECRET_ACCESS_KEY",
+             "valueFrom": {"secretKeyRef": {"name": "s4-credentials", "key": "AWS_SECRET_ACCESS_KEY"}}},
           ],
           "volumeMounts": [
             {"name": "script", "mountPath": "/scripts", "readOnly": True},
@@ -265,5 +271,6 @@ echo "  S3 endpoint:  ${S4_ENDPOINT}  (in-cluster only)"
 echo "  Bucket/path:  s3://${S4_BUCKET}/${HF_C4_PREFIX}/"
 echo "  Connection:   ${S4_CONNECTION_NAME} in ${DS_PROJECTS}"
 echo "  C4b OCI:      oci://image-registry.openshift-image-registry.svc:5000/${PRESENTER_PROJECT}/${HF_C4B_IS}:${HF_C4B_TAG}"
+echo "  C4b conn:     ${INCLUSTER_OCI_CONNECTION_DISPLAY} (${INCLUSTER_OCI_HOST})"
 echo "  Credentials:  setup/.generated-credentials.env"
 echo "  Demo only — replace S4 with enterprise object storage outside this lab."

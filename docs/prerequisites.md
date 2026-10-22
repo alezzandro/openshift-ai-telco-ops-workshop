@@ -16,8 +16,9 @@ Put the Open Environment dump in `private/credentials/gcp-credentials.txt`
 and the Red Hat pull secret in `private/credentials/rh-pull-secret.txt`
 (gitignored). Set `GCP_ACME_EMAIL` in the environment or add a
 `gcp_acme_email` labeled line in that dump. The installer needs the
-**existing** public Cloud DNS zone `vfq4m.gcp.redhatworkshops.io` in project
-`openenv-vfq4m`. Do not create a new zone or change NS.
+**existing** public Cloud DNS zone from that dump
+(`<guid>.gcp.redhatworkshops.io` in project `openenv-<guid>`). Do not create a
+new zone or change NS.
 
 https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_google_cloud/installing-gcp-customizations[Installing a cluster on GCP with customizations (OpenShift 4.22)]
 

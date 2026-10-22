@@ -52,7 +52,7 @@ def machineset(name, zone, role="worker", replicas=1, gpu=False, pool="", l4_cou
                             "machineType": machine_type,
                             "region": "asia-southeast1",
                             "zone": zone,
-                            "projectID": "openenv-vfq4m",
+                            "projectID": "openenv-example",
                             "networkInterfaces": [
                                 {
                                     "network": f"{cluster}-network",
@@ -68,7 +68,7 @@ def machineset(name, zone, role="worker", replicas=1, gpu=False, pool="", l4_cou
                                 }
                             ],
                             "serviceAccounts": [
-                                {"email": f"{cluster}-w@openenv-vfq4m.iam.gserviceaccount.com"}
+                                {"email": f"{cluster}-w@openenv-example.iam.gserviceaccount.com"}
                             ],
                             "tags": [f"{cluster}-worker"],
                             "credentialsSecret": {"name": "gcp-cloud-credentials"},
@@ -244,7 +244,7 @@ class GpuMachineSetTests(unittest.TestCase):
 
     def test_parse_suggested_azs_from_gcp_event(self):
         msg = (
-            "The zone 'projects/openenv-vfq4m/zones/asia-southeast1-a' does not have enough "
+            "The zone 'projects/openenv-example/zones/asia-southeast1-a' does not have enough "
             "resources available to fulfill the request. ZONE_RESOURCE_POOL_EXHAUSTED "
             "g2-standard-48 nvidia-l4. Try asia-southeast1-b later."
         )

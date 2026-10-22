@@ -47,4 +47,4 @@ HardwareProfiles:
 
 == GPU courtesy
 
-Never overlap two large services. Delete or stop your previous InferenceService before the next size class. Registry entries can stay.
+Never overlap two large services. Delete or stop your previous InferenceService before the next size class. Registry entries can stay. P10 Granite is 1 GPU; delete a 1-GPU deployment in your project first if you are at quota. The 2 GPU cap is OpenShift `ResourceQuota` `gpu-quota` on your project (not an OpenShift AI Settings quota). Hardware profiles only size *one* deploy.

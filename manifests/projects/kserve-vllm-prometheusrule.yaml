@@ -1,0 +1,43 @@
+# Observe & monitor Models tab queries kserve_vllm:* recording rules.
+# KServe ServiceMonitors scrape raw vllm:* from <isvc>-metrics :8080;
+# this maps those series so Deployed models / request success populate.
+# One copy in the presenter project is enough: user-workload Prometheus
+# evaluates it against all scraped vLLM series.
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploy_models_using_distributed_inference_with_llm-d/monitoring-llmd-deployments
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kserve-vllm-recording-rules
+  namespace: telco-ops-demo
+  labels:
+    workshop.opendatahub.io/component: observe-monitor
+    # Evaluate on user-workload Prometheus (has vllm:* series), not Thanos Ruler.
+    # https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/monitoring/managing-metrics
+    openshift.io/prometheus-rule-evaluation-scope: leaf-prometheus
+spec:
+  groups:
+    - name: kserve.vllm.metrics
+      interval: 15s
+      rules:
+        - record: kserve_vllm:num_requests_running
+          expr: vllm:num_requests_running
+        - record: kserve_vllm:num_requests_waiting
+          expr: vllm:num_requests_waiting
+        - record: kserve_vllm:request_success_total
+          expr: vllm:request_success_total
+        - record: kserve_vllm:prompt_tokens_total
+          expr: vllm:prompt_tokens_total
+        - record: kserve_vllm:generation_tokens_total
+          expr: vllm:generation_tokens_total
+        - record: kserve_vllm:e2e_request_latency_seconds_bucket
+          expr: vllm:e2e_request_latency_seconds_bucket
+        - record: kserve_vllm:e2e_request_latency_seconds_count
+          expr: vllm:e2e_request_latency_seconds_count
+        - record: kserve_vllm:e2e_request_latency_seconds_sum
+          expr: vllm:e2e_request_latency_seconds_sum
+        - record: kserve_vllm:time_to_first_token_seconds_bucket
+          expr: vllm:time_to_first_token_seconds_bucket
+        - record: kserve_vllm:time_to_first_token_seconds_count
+          expr: vllm:time_to_first_token_seconds_count
+        - record: kserve_vllm:time_to_first_token_seconds_sum
+          expr: vllm:time_to_first_token_seconds_sum

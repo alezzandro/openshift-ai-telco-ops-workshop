@@ -71,7 +71,12 @@ echo "4. Creating GPU ClusterPolicy..."
 oc apply -f "${MANIFESTS_DIR}/gpu-cluster-policy.yaml"
 echo ""
 
-echo "5. Waiting for allocatable GPUs on pools that have replicas > 0..."
+echo "5. DCGM ServiceMonitor (Observe & monitor GPU consumption)..."
+oc label ns nvidia-gpu-operator openshift.io/cluster-monitoring=true --overwrite >/dev/null
+oc apply -f "${MANIFESTS_DIR}/dcgm-servicemonitor.yaml"
+echo ""
+
+echo "6. Waiting for allocatable GPUs on pools that have replicas > 0..."
 pool_ok() {
   local selector="$1"
   local needed="$2"
@@ -139,6 +144,34 @@ if [ "${OK}" -ne 1 ]; then
   echo "  [WARN] GPU allocatable capacity not ready yet. Driver may still be installing."
   echo "         Re-run this script or ./setup/health-check.sh later."
 fi
+fi
+
+echo ""
+echo "7. Waiting for Prometheus to scrape DCGM_FI_DEV_GPU_UTIL..."
+prometheus_has_dcgm() {
+  oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+    wget -qO- 'http://127.0.0.1:9090/api/v1/query?query=count(DCGM_FI_DEV_GPU_UTIL)' 2>/dev/null \
+    | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+rows = (data.get("data") or {}).get("result") or []
+if not rows:
+    sys.exit(1)
+sys.exit(0 if float(rows[0]["value"][1]) >= 1 else 1)
+'
+}
+DCGM_OK=0
+for i in $(seq 1 24); do
+  if prometheus_has_dcgm; then
+    echo "  [OK] cluster Prometheus has DCGM_FI_DEV_GPU_UTIL"
+    DCGM_OK=1
+    break
+  fi
+  echo "  Attempt ${i}/24 — waiting for DCGM scrape"
+  sleep 10
+done
+if [ "${DCGM_OK}" -ne 1 ]; then
+  echo "  [WARN] DCGM_FI_DEV_GPU_UTIL not in Prometheus yet. Observe & monitor GPU charts stay empty until scrape starts."
 fi
 
 echo ""

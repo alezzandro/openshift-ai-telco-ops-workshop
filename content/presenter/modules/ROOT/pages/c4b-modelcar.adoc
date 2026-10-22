@@ -1,28 +1,50 @@
 = C4b. Package a Hugging Face model as a ModelCar
 
-Time: about 8 minutes. Skip on a 60-minute cut. The image was **pre-built** during setup so you do not wait on Hugging Face.
+Time: about 8 minutes. Skip on a 60-minute cut.
 
-C4 served weights **from S3**. Edge sites, disconnected clusters, and GitOps pipelines often want the same snapshot as an **OCI image** (a ModelCar): pull it like any other container, then KServe copies `/models` into the predictor.
+Same governed path as C3 and C4: **register a version in Model Registry workshop**, then **deploy that version**. This time the artifact is an **OCI ModelCar** you built, not a catalog card and not an S3 prefix.
 
-https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying-models_rhoai-user[Storing a model in an OCI image]
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying-models_rhoai-user[OCI-based model storage (ModelCar)]
 
-https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry[Working with model registries]
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_on_projects/using-connections_projects[Use connections]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry#registering-a-model-from-the-dashboard[Register a model from the dashboard]
 
 == Story
 
-A ModelCar is a UBI9 image whose only job is to hold model files under `/models`. The serving runtime stays vLLM. You do **not** bake vLLM into this image.
+Catalog ModelCars are the supported path when Red Hat already publishes the image. A data-science team still shows up with an arbitrary Hugging Face snapshot. Two production-shaped options:
 
-Dashboard **Register and store** can also turn an S3 or `hf://` origin into a ModelCar Job. This chapter shows the Containerfile you would keep in Git, which is the air-gap-friendly path.
+. Land weights in **enterprise object storage** and deploy from S3 (C4).
+. Wrap the snapshot as a **ModelCar** (UBI9 image, files under `/models`) and pull it like any other OCI artifact.
+
+Dashboard **Register and store** can bake a ModelCar for you. This lab shows the Containerfile so you can talk about reproducibility, air-gap, and the in-cluster registry.
 
 == Model
 
-* `ibm-granite/granite-3.3-2b-instruct` (Apache 2.0) — small enough for **1 × L4** with KV headroom
-* ImageStream `{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop`
-* URI: `oci://image-registry.openshift-image-registry.svc:5000/{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop`
+* `ibm-granite/granite-3.3-2b-instruct` (Apache 2.0)
+* About 5 GB — validated **1 × L4**
+* Setup already built ImageStream `{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop` (do **not** start a second 20–40 minute build on stage)
+* URI:
 
-== 1. Containerfile (what setup built)
+[subs="attributes"]
+----
+oci://image-registry.openshift-image-registry.svc:5000/{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop
+----
 
-The workshop file is `manifests/modelcar/Containerfile`:
+== GPU
+
+Rehearsal is **four** L4s. If Ministral (1) and Phi-4 (2) are still Ready, Qwen from C4 is sitting on the last card. **Delete the Qwen InferenceService** (keep the registry version) before Granite. Do not delete Ministral or Phi-4 unless you need more than one L4.
+
+. **AI hub → Registry** → Qwen version → deployments → **Delete** (or **AI hub → Deployments** → Qwen → Delete).
+. Confirm `{presenter_project}` has a free GPU in **Observe & monitor → Infrastructure**.
+
+== 1. Show the Containerfile
+
+Official pattern: a UBI9 base **with a shell**, model files under `/models`, world-readable, non-root user. KServe uses the shell to make those files visible to vLLM. Do not use `scratch`.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying-models_rhoai-user#storing-a-model-in-an-oci-image[Store a model in an OCI image]
+
+From the repo (`manifests/modelcar/Containerfile`):
 
 ----
 FROM registry.access.redhat.com/ubi9/python-311:1 AS fetch
@@ -38,42 +60,79 @@ RUN chmod -R a=rX /models
 USER 65534
 ----
 
-Rules from product docs: the final image **must have a shell** (not `scratch`); files are world-readable for the random OpenShift UID.
+Talking point: "First stage pulls Hugging Face. Runtime is UBI9 Minimal. Same image the cluster already built into the in-cluster registry."
 
-To rebuild (do **not** on stage unless the ImageStream is missing):
+Optional: OpenShift console → project `{presenter_project}` → Builds → `modelcar-granite-3-3-2b-instruct` → complete ImageStreamTag `workshop`.
+
+== 2. Connection (pull secret)
+
+The internal registry is **not** in the cluster global pull secret. Catalog connection **Red Hat catalog ModelCars** (`registry.redhat.io`) cannot authenticate this host. `system:image-puller` lets another namespace's ServiceAccount *use* a token; it does **not** attach credentials to the KServe ModelCar pull. The operator injects `spec.predictor.imagePullSecrets` from an OCI connection of type `kubernetes.io/dockerconfigjson`.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_on_projects/using-connections_projects#creating-an-oci-compatible-connection-type-using-the-connections-api_projects[Creating an OCI-compatible connection]
+
+Setup already created **In-cluster registry** in `{presenter_project}`, `{ran_project}`, and `{core_project}`.
+
+. OpenShift AI → project `{presenter_project}` → **Connections**.
+. Confirm **In-cluster registry**: OCI host `image-registry.openshift-image-registry.svc:5000` (the port is required).
+. On deploy, that connection autoselects. A single match looks locked. Leave it. Do **not** create a second connection named after Granite.
+
+=== Attach the Docker config JSON (customer procedure)
+
+Walk this once as the private-registry talking point. On stage, keep the setup connection — do not add a second host match.
+
+The default ServiceAccount pull secret is type `kubernetes.io/dockercfg` (legacy `.dockercfg`, a host map). The dashboard and KServe need `.dockerconfigjson` with an `auths` wrapper. Uploading `.dockercfg` unchanged stores hosts at the JSON root; KServe reports `authentication required`.
+
+From the OpenShift Web Terminal or a workstation with `oc` (do **not** cat the file on the projector):
 
 ----
-oc start-build modelcar-granite-3-3-2b-instruct -n telco-ops-demo --follow
+NS=telco-ops-demo
+SECRET=$(oc get sa default -n "$NS" -o jsonpath='{.imagePullSecrets[0].name}')
+oc get secret "$SECRET" -n "$NS" -o json \
+  | python3 -c 'import base64,json,sys; cfg=json.loads(base64.b64decode(json.load(sys.stdin)["data"][".dockercfg"])); json.dump({"auths": cfg}, sys.stdout)' \
+  > /tmp/in-cluster-registry.json
 ----
 
-Setup already ran that build. Confirm:
+Then in the dashboard:
 
+. **Connections** → **Add connection** → **OCI-compliant registry**.
+. Name: `In-cluster registry`.
+. OCI storage location: `image-registry.openshift-image-registry.svc:5000` (include `:5000`; do not paste the registry ClusterIP).
+. Access type: **Pull**.
+. Upload `/tmp/in-cluster-registry.json` as the Docker config JSON. Not the raw `.dockercfg`.
+. **Add connection**.
+
+If a leftover Granite-named connection is already in the list, delete it after **In-cluster registry** exists. Matching is by OCI host, not by model name.
+
+== 3. Register the OCI URI
+
+. **AI hub → Registry**. Registry **workshop**. **Register model**.
+. Location type: **OCI-compliant registry** (URI).
+. Connection: **In-cluster registry**.
+. URI:
+
+[subs="attributes"]
 ----
-oc get istag modelcar-granite-3-3-2b-instruct:workshop -n telco-ops-demo
+oci://image-registry.openshift-image-registry.svc:5000/{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop
 ----
 
-== 2. Register the OCI URI
-
-. **AI hub → Registry** → **Register model**.
-. **Register** (metadata only). Location: **URI**:
-+
-`oci://image-registry.openshift-image-registry.svc:5000/telco-ops-demo/modelcar-granite-3-3-2b-instruct:workshop`
-. Name: `granite-3-3-2b-instruct`. Version: `workshop`. Format: `vLLM` / `1`.
+. Model name: `granite-3-3-2b-instruct`. Version: `workshop`. Format: `vLLM` / `1`.
 . **Register model**.
 
-== 3. Deploy
+== 4. Deploy the registered version
 
-. Version `workshop` → ⋮ → **Deploy**. Hardware profile *NVIDIA L4 - 1 GPU*.
-. **Model access** + **Require token authentication** (`workshop-infer`).
-. `--max-model-len=8192` (no leading space).
-. Wait **Ready**. Curl the Route like C3.
+. Version `workshop` → ⋮ → **Deploy**. Project `{presenter_project}`.
+. Connection **In-cluster registry** autoselects. Leave it.
+. Hardware profile: *NVIDIA L4 - 1 GPU*. Serving runtime: vLLM NVIDIA GPU.
+. Advanced settings: **Model access**, **Require token authentication** (`workshop-infer`).
+. Custom runtime arguments (no leading space): `--max-model-len=8192`
+. Review → **Deploy**. Wait **Ready**.
 
-If C3 and C4 are still up this is a **third** GPU. Fine on 4-L4; delete one if you are heading into C6.
+If ImagePullBackOff still says `authentication required`, the connection's `.dockerconfigjson` has no `auths` map. Recreate **In-cluster registry** with the convert-and-upload steps, delete the failed InferenceService, deploy again.
 
-Talking points:
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry#deploying-a-model-version-from-a-model-registry[Deploy a model version from a model registry]
 
-* S3 (C4) is the **data-center** path. ModelCar (C4b) is the **image** path — same registry, same GitOps, works when object storage is not in the edge site.
-* Both still go through Model Registry before deploy.
-* In production the OCI destination is Quay or a disconnected mirror, not only the in-cluster registry.
+== Test with curl
+
+Point `MODEL_URL` at the Granite Route and reuse `workshop-infer`. Short prompt. Ops talking point: ModelCar vs S3 is a packaging choice; governance is still register-then-deploy.
 
 Next: xref:c5-inference-types.adoc[C5. Inference service types].

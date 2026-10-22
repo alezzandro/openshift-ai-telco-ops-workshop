@@ -1,6 +1,11 @@
 # Allow DNS, ingress controller, OpenShift AI dashboard, and Open WebUI into
 # each Data Science Project. Default deny is not forced so KServe can still
 # talk to the API; these policies are additive allow rules.
+#
+# Any Ingress NetworkPolicy that selects a pod isolates it. The predictor
+# policies below therefore also need an allow for OpenShift user-workload
+# Prometheus (label network.openshift.io/policy-group=monitoring) on the
+# KServe metrics port, or Observe & monitor Deployed models stays "No data".
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -213,6 +218,33 @@ spec:
         - protocol: TCP
           port: 8443
 ---
+# User-workload Prometheus scrapes <isvc>-metrics :8080. Same isolation as
+# allow-openshift-ingress: without this allow, scrape targets stay down.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-openshift-monitoring
+  namespace: telco-ops-demo
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 9464
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -238,6 +270,31 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
+  name: allow-from-openshift-monitoring
+  namespace: telco-ran-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 9464
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
   name: allow-openshift-ingress
   namespace: telco-core-ai
 spec:
@@ -256,3 +313,28 @@ spec:
           port: 8080
         - protocol: TCP
           port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-openshift-monitoring
+  namespace: telco-core-ai
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8443
+        - protocol: TCP
+          port: 9464

@@ -40,7 +40,7 @@ Verification: **AI hub → Registry** → registry **workshop** shows the new mo
 
 . Still on **AI hub → Registry**, registry **workshop**.
 . Open the Ministral model. On version `3.0`, action menu (⋮) → **Deploy**.
-. Project: `{presenter_project}`. If no matching connection exists, continue — the wizard autofills the catalog URI as a new connection.
+. Project: `{presenter_project}`. Connection **Red Hat catalog ModelCars** autoselects (OCI host `registry.redhat.io`). Setup created it. That connection is the catalog *registry*, reused by every `registry.redhat.io` ModelCar (C6 Phi-4 included). Do **not** create a second connection named after Ministral. A single match looks locked in the dropdown — that is expected.
 . **Deploy** to open the serving wizard:
 ** Model type: Generative AI
 ** Serving runtime: vLLM NVIDIA GPU (or auto-select)

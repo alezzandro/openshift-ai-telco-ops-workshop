@@ -90,9 +90,14 @@ issue_cert() {
 issue_cert api "${API_HOST}"
 issue_cert apps "${APPS_HOST}"
 
-API_CRT="$(find "${CERT_DIR}/api/certificates" -name '*.crt' ! -name '*issuer*' | head -1)"
-API_KEY="$(find "${CERT_DIR}/api/certificates" -name '*.key' | head -1)"
-APPS_CRT="$(find "${CERT_DIR}/apps/certificates" -name '*.crt' ! -name '*issuer*' | head -1)"
+API_CRT="$(find "${CERT_DIR}/api/certificates" -name "${API_HOST}.crt" | head -1)"
+API_KEY="$(find "${CERT_DIR}/api/certificates" -name "${API_HOST}.key" | head -1)"
+API_ISSUER="$(find "${CERT_DIR}/api/certificates" -name "${API_HOST}.issuer.crt" | head -1)"
+APPS_CRT="$(find "${CERT_DIR}/apps/certificates" -name "${DOMAIN}.crt" -o -name "_.${DOMAIN}.crt" | head -1)"
+# lego names wildcard files _.apps.<cluster>.<base>.crt
+if [ -z "${APPS_CRT}" ]; then
+  APPS_CRT="$(find "${CERT_DIR}/apps/certificates" -name '*.crt' ! -name '*issuer*' | head -1)"
+fi
 APPS_KEY="$(find "${CERT_DIR}/apps/certificates" -name '*.key' | head -1)"
 if [ -z "${API_CRT}" ] || [ -z "${API_KEY}" ] || [ -z "${APPS_CRT}" ] || [ -z "${APPS_KEY}" ]; then
   echo "  ERROR: lego did not write certificate files under ${CERT_DIR}" >&2
@@ -107,6 +112,33 @@ oc create secret tls api-tls -n openshift-config \
 API_PATCH="$(python3 -c "import json; print(json.dumps({'spec':{'servingCerts':{'namedCertificates':[{'names':['${API_HOST}'],'servingCertificate':{'name':'api-tls'}}]}}}))")"
 oc patch apiserver cluster --type=merge -p "${API_PATCH}"
 echo "  [OK] APIServer namedCertificates -> api-tls"
+
+# Installer kubeconfig trusts the kube-apiserver-lb-signer. After
+# namedCertificates the public API presents Let's Encrypt, so oc fails
+# with x509 unknown authority until the kubeconfig CA matches.
+if [ -n "${API_ISSUER}" ] && [ -f "${CLUSTER_DIR}/auth/kubeconfig" ]; then
+  KUBECONFIG_PATH="${CLUSTER_DIR}/auth/kubeconfig" API_ISSUER="${API_ISSUER}" python3 - <<'PY'
+import base64, os
+from pathlib import Path
+issuer = Path(os.environ["API_ISSUER"]).read_bytes()
+kube = Path(os.environ["KUBECONFIG_PATH"])
+text = kube.read_text()
+# Replace every certificate-authority-data value with the LE issuer.
+import re
+b64 = base64.b64encode(issuer).decode()
+new, n = re.subn(
+    r"certificate-authority-data:\s*\S+",
+    "certificate-authority-data: " + b64,
+    text,
+)
+if n:
+    kube.write_text(new)
+    kube.chmod(0o600)
+    print(f"  [OK] kubeconfig CA -> Let's Encrypt issuer ({n} cluster entries)")
+else:
+    print("  [WARN] kubeconfig had no certificate-authority-data to replace")
+PY
+fi
 echo ""
 
 echo "2. Ingress default certificate..."

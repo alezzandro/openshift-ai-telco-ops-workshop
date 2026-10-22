@@ -6,7 +6,7 @@ Every serving exercise uses the same path as the guided demo: **register a versi
 
 == P1. Catalog → registry → deploy
 
-From **AI hub → Models → Catalog**, open Ministral 3 14B Instruct and **Register model** into **workshop** (skip if the presenter already registered it). Then **AI hub → Registry** → that version → **Deploy** into your project.
+From **AI hub → Models → Catalog**, open Ministral 3 14B Instruct and **Register model** into **workshop** (skip if the presenter already registered it). Then **AI hub → Registry** → that version → **Deploy** into your project. Connection **Red Hat catalog ModelCars** autoselects (OCI host `registry.redhat.io`); leave it.
 
 Advanced settings: **Add as AI asset endpoint** (use case `chat`), **Model access**, **Require token authentication** with service account `workshop-infer`, runtime args `--max-model-len=24576`, `--enable-auto-tool-choice`, `--tool-call-parser=mistral` (needed for xref:p9-gen-ai-playground.adoc[P9]). `--max-model-len=8192` is too small once Playground injects OpenShift MCP tool schemas.
 
@@ -59,9 +59,9 @@ Stretch: xref:p10-modelcar.adoc[P10. Custom ModelCar].
 
 == P3. Tensor parallel
 
-Delete previous large services (keep registry entries). Register Mistral Small 3.1 24B FP8 (catalog card, or URI
-`oci://registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503-fp8-dynamic:1.5`)
-then deploy with *2 GPU tensor parallel* and `--tensor-parallel-size=2` (keep **Model access** and token auth). Confirm two GPUs show memory in OpenShift AI **Observe & monitor → Infrastructure**. Re-point `MODEL_URL` at the new Route and curl again.
+Delete previous large services (keep registry entries). Register **Phi-4** (14B BF16 — catalog card with min vRAM ~33.8 GB, or URI
+`oci://registry.redhat.io/rhelai1/modelcar-phi-4:1.5`).
+Do not pick Phi-4-mini or a Phi-4 FP8 / w8a8 card (those fit one L4). Deploy with *2 GPU tensor parallel* and `--tensor-parallel-size=2` (keep **Add as AI asset endpoint**, **Model access**, and token auth). Connection **Red Hat catalog ModelCars** autoselects — same registry host as P1, not a leftover Ministral model. Confirm two GPUs show memory in OpenShift AI **Observe & monitor → Infrastructure**. Re-point `MODEL_URL` at the new Route, curl `/v1/models`, then a short chat completion (`Reply with exactly the word PONG.`). Expect a normal English reply.
 
 On rehearsal this shares the presenter 4-L4 node. On class day it uses a whole 2-L4 node. Coordinate with the other tenant.
 
@@ -77,6 +77,10 @@ From the Registry, deploy (or edit) Ministral 14B on 1 GPU with `minReplicas=2`.
 
 From the other project, deploy the **same** registered Ministral version. Prove you cannot see the other team's InferenceService in **your** OpenShift AI project. Curl *their* Route with *your* `workshop-infer` token — expect **401**. Isolation is the Data Science Project, quota, NetworkPolicy, and token auth.
 
+The **2 GPU** cap on `{ran_project}` / `{core_project}` is an OpenShift `ResourceQuota` (`gpu-quota`), not a toggle under OpenShift AI Settings. OpenShift AI Hardware profiles only set how many GPUs *one* deploy requests. Kueue `ClusterQueue` quota is the shared pool (jobs queue when the flavor is full). A third GPU in your project is **Forbidden** (`exceeded quota`). `oc describe resourcequota gpu-quota -n <your-project>`.
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/quotas[Resource quotas (OpenShift 4.22)]
+
 == P7. `max-model-len`
 
 Change `--max-model-len` on a 1-GPU model and watch VRAM / KV in metrics. Context length is an ops control on L4.
@@ -87,6 +91,6 @@ Delete all of *your* InferenceServices. Confirm you are not holding `nvidia.com/
 
 Stretch: from **AI hub → MCP servers → Catalog**, inspect **workshop-custom-mcp** (the custom catalog example from C2b). Do **not** deploy a second cluster-inspect MCP without the facilitator. MCP Catalog is Technology Preview.
 
-Stretch (coordinate): 24B BF16 on 4 GPUs — register the URI first, then delete the InferenceService so the other tenant can work.
+Stretch (coordinate): Mistral Small 3.1 24B BF16 on 4 GPUs (`oci://registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503:1.5`) — register the URI first, then delete the InferenceService so the other tenant can work.
 
 Continue with xref:p9-gen-ai-playground.adoc[P9. Gen AI Studio Playground and OpenShift MCP].

@@ -48,7 +48,7 @@ tensor parallelism on this shape uses NCCL over PCIe. Do **not** add a second
 
 - **Google Cloud IPI** Red Hat OpenShift 4.22 in **asia-southeast1** (this repo installs it)
 - Pull access to `registry.redhat.io` / `registry.access.redhat.com` (Red Hat pull secret)
-- Public Cloud DNS zone `vfq4m.gcp.redhatworkshops.io` already in the project (do not create or re-delegate DNS)
+- Public Cloud DNS zone already in the Open Environment project (`<guid>.gcp.redhatworkshops.io`; do not create or re-delegate DNS)
 - Regional **NVIDIA_L4_GPUS** quota ≥ 4 for rehearsal, ≥ 10 for class
 - Workstation: Google Cloud SDK (`gcloud`); `mise` (`kubectl`, `jq`); `oc` and `openshift-install` 4.22.18 from the OpenShift mirror; `python3`, `openssl`, `curl`, `htpasswd`, `lego`
 

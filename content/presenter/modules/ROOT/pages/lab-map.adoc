@@ -73,9 +73,9 @@ Never overlap two large services. Delete or stop the previous InferenceService b
 | 1 GPU (or keep Ministral + one small replica)
 
 | Granite 2B ModelCar (C4b)
-| 1 GPU (optional; still 1 × L4)
+| 1 GPU — on rehearsal, delete Qwen (C4) first if Ministral + Phi-4 still occupy 3 L4s
 
-| 24B FP8 tensor parallel
+| Phi-4 BF16 tensor parallel
 | 2 GPUs (delete previous large service)
 
 | Isolation playground

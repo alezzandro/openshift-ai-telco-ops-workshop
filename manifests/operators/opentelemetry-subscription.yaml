@@ -1,0 +1,26 @@
+# Red Hat build of OpenTelemetry — DSCI metrics stack deploys an
+# OpenTelemetryCollector once spec.monitoring.metrics.storage is set.
+# Traces / Tempo are not enabled (not required for Observe dashboards).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-opentelemetry-operator
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: opentelemetry-operator
+  namespace: openshift-opentelemetry-operator
+spec: {}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: opentelemetry-product
+  namespace: openshift-opentelemetry-operator
+spec:
+  channel: stable
+  name: opentelemetry-product
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic

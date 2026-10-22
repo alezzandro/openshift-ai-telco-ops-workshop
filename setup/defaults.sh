@@ -34,7 +34,9 @@ VLLM_IMAGE_FALLBACK="${VLLM_IMAGE_FALLBACK:-registry.redhat.io/rhaiis/vllm-cuda-
 MODELCAR_MINISTRAL_14B="${MODELCAR_MINISTRAL_14B:-registry.redhat.io/rhai/modelcar-ministral-3-14b-instruct-2512:3.0}"
 MODELCAR_QWEN_7B="${MODELCAR_QWEN_7B:-registry.redhat.io/rhelai1/modelcar-qwen2-5-7b-instruct:1.5}"
 MODELCAR_QWEN_7B_W4A16="${MODELCAR_QWEN_7B_W4A16:-registry.redhat.io/rhelai1/modelcar-qwen2-5-7b-instruct-quantized-w4a16:1.5}"
-MODELCAR_MISTRAL_24B_FP8="${MODELCAR_MISTRAL_24B_FP8:-registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503-fp8-dynamic:1.5}"
+# C6 / P3: 14B BF16, min vRAM ~33.8 GB — validated 2×L4, does not fit 1×L4.
+MODELCAR_PHI_4="${MODELCAR_PHI_4:-registry.redhat.io/rhelai1/modelcar-phi-4:1.5}"
+# Playground stretch only (4×L4). Not the C6 path.
 MODELCAR_MISTRAL_24B="${MODELCAR_MISTRAL_24B:-registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503:1.5}"
 
 DS_PROJECTS="${DS_PROJECTS:-telco-ops-demo telco-ran-ai telco-core-ai}"
@@ -57,6 +59,15 @@ S4_IMAGE="${S4_IMAGE:-quay.io/rh-aiservices-bu/s4:0.3.2-2}"
 S4_NS="${S4_NS:-s4}"
 S4_BUCKET="${S4_BUCKET:-models}"
 S4_CONNECTION_NAME="${S4_CONNECTION_NAME:-workshop-s4-models}"
+# Catalog ModelCars share one OCI-v1 connection (match is by host, not model name).
+CATALOG_OCI_CONNECTION_NAME="${CATALOG_OCI_CONNECTION_NAME:-redhat-catalog-modelcars}"
+CATALOG_OCI_CONNECTION_DISPLAY="${CATALOG_OCI_CONNECTION_DISPLAY:-Red Hat catalog ModelCars}"
+CATALOG_OCI_HOST="${CATALOG_OCI_HOST:-registry.redhat.io}"
+# C4b / P10: in-cluster ImageStream ModelCars. OpenShift registry requires
+# a dockerconfigjson pull secret (legacy .dockercfg must be wrapped in auths).
+INCLUSTER_OCI_CONNECTION_NAME="${INCLUSTER_OCI_CONNECTION_NAME:-incluster-registry}"
+INCLUSTER_OCI_CONNECTION_DISPLAY="${INCLUSTER_OCI_CONNECTION_DISPLAY:-In-cluster registry}"
+INCLUSTER_OCI_HOST="${INCLUSTER_OCI_HOST:-image-registry.openshift-image-registry.svc:5000}"
 HF_C4_REPO="${HF_C4_REPO:-Qwen/Qwen2.5-7B-Instruct}"
 HF_C4_PREFIX="${HF_C4_PREFIX:-qwen2.5-7b-instruct}"
 HF_C4B_REPO="${HF_C4B_REPO:-ibm-granite/granite-3.3-2b-instruct}"

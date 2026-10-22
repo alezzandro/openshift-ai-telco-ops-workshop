@@ -123,16 +123,11 @@ def start_s4_import(token: str) -> str | None:
     return None
 
 
-def boto_upload() -> None:
-    from huggingface_hub import snapshot_download
+def s3_client():
     import boto3
     from botocore.config import Config
-    from pathlib import Path
 
-    dest = Path("/tmp/hf-model")
-    print(f"  snapshot_download {REPO} -> {dest}", flush=True)
-    snapshot_download(repo_id=REPO, local_dir=str(dest))
-    client = boto3.client(
+    return boto3.client(
         "s3",
         endpoint_url=S4_S3,
         aws_access_key_id=ACCESS,
@@ -141,6 +136,37 @@ def boto_upload() -> None:
         use_ssl=False,
         config=Config(s3={"addressing_style": "path"}),
     )
+
+
+def is_hf_junk_key(key: str) -> bool:
+    parts = key.split("/")
+    return ".cache" in parts or ".huggingface" in parts
+
+
+def purge_hf_junk(client) -> int:
+    """KServe downloads every object under the prefix. HF .cache metadata
+    is not part of the model and has crashed S4 RGW with EMFILE/HTTP 500."""
+    deleted = 0
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=BUCKET, Prefix=f"{PREFIX}/"):
+        for obj in page.get("Contents") or []:
+            key = obj.get("Key") or ""
+            if not is_hf_junk_key(key):
+                continue
+            client.delete_object(Bucket=BUCKET, Key=key)
+            deleted += 1
+            print(f"  deleted junk {key}", flush=True)
+    return deleted
+
+
+def boto_upload() -> None:
+    from huggingface_hub import snapshot_download
+    from pathlib import Path
+
+    dest = Path("/tmp/hf-model")
+    print(f"  snapshot_download {REPO} -> {dest}", flush=True)
+    snapshot_download(repo_id=REPO, local_dir=str(dest))
+    client = s3_client()
     files = [
         p
         for p in dest.rglob("*")
@@ -165,6 +191,10 @@ def main() -> int:
     print(f"Seeding s3://{BUCKET}/{PREFIX}/ from {REPO}", flush=True)
     token = login()
     ensure_bucket(token)
+    n = purge_hf_junk(s3_client())
+    print(f"  purged {n} Hugging Face cache keys from prefix", flush=True)
+    if os.environ.get("SEED_PURGE_ONLY", "0") == "1":
+        return 0
     objs = list_prefix(token)
     if prefix_ready(objs):
         print(f"  already populated ({len(objs)} objects listed)", flush=True)
@@ -177,7 +207,8 @@ def main() -> int:
         while time.time() < deadline:
             objs = list_prefix(token)
             if prefix_ready(objs):
-                print(f"  import complete ({len(objs)} objects listed)", flush=True)
+                n = purge_hf_junk(s3_client())
+                print(f"  import complete ({len(objs)} objects listed, purged {n} cache keys)", flush=True)
                 return 0
             weight = sum(
                 int(o.get("Size") or 0)
@@ -195,9 +226,10 @@ def main() -> int:
     else:
         print("  S4 import API unavailable; falling back to huggingface_hub", flush=True)
     boto_upload()
+    n = purge_hf_junk(s3_client())
     objs = list_prefix(token)
     if prefix_ready(objs):
-        print(f"  upload complete ({len(objs)} objects listed)", flush=True)
+        print(f"  upload complete ({len(objs)} objects listed, purged {n} cache keys)", flush=True)
         return 0
     print("  WARNING: prefix still looks empty after upload", flush=True)
     return 1

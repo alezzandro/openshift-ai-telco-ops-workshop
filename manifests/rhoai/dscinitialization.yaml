@@ -1,4 +1,4 @@
-apiVersion: dscinitialization.opendatahub.io/v1
+apiVersion: dscinitialization.opendatahub.io/v2
 kind: DSCInitialization
 metadata:
   name: default-dsci
@@ -7,6 +7,13 @@ spec:
   monitoring:
     managementState: Managed
     namespace: redhat-ods-monitoring
+    # Required for Observe & monitor dashboards (GPU consumption, cluster metrics).
+    # https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-observability_managing-rhoai
+    metrics:
+      replicas: 1
+      storage:
+        size: 5Gi
+        retention: 7d
   serviceMesh:
     managementState: Removed
   trustedCABundle:

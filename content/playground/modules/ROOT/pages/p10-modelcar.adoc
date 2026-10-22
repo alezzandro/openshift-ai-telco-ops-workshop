@@ -1,15 +1,42 @@
-= P10. Custom ModelCar from Hugging Face
+= P10. Custom ModelCar (stretch)
 
-Setup pre-built `ibm-granite/granite-3.3-2b-instruct` as a ModelCar in the in-cluster registry so you do not download Hugging Face during class.
+Coordinate GPUs with the other tenant and with the facilitator. Granite needs **1 × L4**. Delete a 1-GPU deployment in *your* project first if you are at quota. Keep the registry entry.
 
-URI:
+Setup already built this ImageStream in `{presenter_project}`:
+
+[subs="attributes"]
+----
+oci://image-registry.openshift-image-registry.svc:5000/{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop
+----
+
+That is an in-cluster registry pull. Catalog connection **Red Hat catalog ModelCars** (`registry.redhat.io`) cannot authenticate it.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying-models_rhoai-user[OCI-based model storage (ModelCar)]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_on_projects/using-connections_projects[Use connections]
+
+== Connection
+
+Your project already has **In-cluster registry** (host `image-registry.openshift-image-registry.svc:5000`). Leave it. A single match looks locked in the deploy dropdown.
+
+If you must create it yourself, do **not** upload the default ServiceAccount `.dockercfg` unchanged. Convert it to dockerconfigjson (auths wrapper), then **Connections** → **Add connection** → **OCI-compliant registry**, host with `:5000`, access type **Pull**, upload the converted file:
 
 ----
-oci://image-registry.openshift-image-registry.svc:5000/telco-ops-demo/modelcar-granite-3-3-2b-instruct:workshop
+NS=<your-project>
+SECRET=$(oc get sa default -n "$NS" -o jsonpath='{.imagePullSecrets[0].name}')
+oc get secret "$SECRET" -n "$NS" -o json \
+  | python3 -c 'import base64,json,sys; cfg=json.loads(base64.b64decode(json.load(sys.stdin)["data"][".dockercfg"])); json.dump({"auths": cfg}, sys.stdout)' \
+  > /tmp/in-cluster-registry.json
 ----
 
-. **AI hub → Registry** → **Register model** (metadata, URI above), format `vLLM`, version `workshop`.
-. Deploy into *your* project with *1 GPU*, **Model access**, `workshop-infer` token auth, `--max-model-len=8192`.
-. Curl the Route. Delete the InferenceService when finished so P3 still has L4s.
+Do not print that file. Uploading raw `.dockercfg` yields `authentication required` on the ModelCar pull.
 
-The Containerfile is UBI9 + `/models` (see the presenter C4b page). Do not `oc start-build` unless the facilitator says the ImageStream is missing.
+== Register then deploy
+
+. **AI hub → Registry** → **Register model**. Location: **OCI-compliant registry**. Connection **In-cluster registry**. Paste the `oci://` URI above. Name `granite-3-3-2b-instruct`, version `workshop`, format `vLLM`.
+. Deploy into *your* project with *NVIDIA L4 - 1 GPU*, **Model access**, token auth (`workshop-infer`), `--max-model-len=8192`. Connection **In-cluster registry** autoselects.
+. Curl the Route like P1.
+
+The Containerfile is UBI9 with weights under `/models` (`manifests/modelcar/Containerfile`). Dashboard **Register and store** can also bake a ModelCar; this exercise uses the pre-built ImageStream so class does not wait on a Hugging Face download.
+
+Delete the InferenceService when you are done so P3–P5 still have L4s.

@@ -119,6 +119,7 @@ if [ -n "${S4_HOST}" ]; then
   echo "  Bucket/path: s3://${S4_BUCKET}/${HF_C4_PREFIX}/   (${HF_C4_REPO})"
   echo "  Connection:  ${S4_CONNECTION_NAME} (all Data Science Projects)"
   echo "  C4b OCI:     oci://image-registry.openshift-image-registry.svc:5000/${PRESENTER_PROJECT}/${HF_C4B_IS}:${HF_C4B_TAG}"
+  echo "  C4b conn:    ${INCLUSTER_OCI_CONNECTION_DISPLAY} (${INCLUSTER_OCI_HOST}; dockerconfigjson)"
   echo "  Replace S4 with OpenShift Data Foundation / cloud S3 outside this lab."
 else
   echo "  [NOT DEPLOYED]  Run ./setup/12-deploy-s4.sh"

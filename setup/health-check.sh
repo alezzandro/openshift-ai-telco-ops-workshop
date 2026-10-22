@@ -172,6 +172,17 @@ else
   fi
 fi
 
+if oc get servicemonitor nvidia-dcgm-exporter -n nvidia-gpu-operator &>/dev/null; then
+  pass "DCGM ServiceMonitor nvidia-dcgm-exporter"
+else
+  fail "DCGM ServiceMonitor missing (Observe & monitor GPU consumption empty)"
+  if [ "${FIX}" -eq 1 ]; then
+    oc label ns nvidia-gpu-operator openshift.io/cluster-monitoring=true --overwrite >/dev/null || true
+    oc apply -f "${SCRIPT_DIR}/../manifests/operators/gpu-cluster-policy.yaml" || true
+    oc apply -f "${SCRIPT_DIR}/../manifests/operators/dcgm-servicemonitor.yaml" || true
+  fi
+fi
+
 section "3b. Let's Encrypt certificates"
 DOMAIN="$(cluster_domain)"
 CONSOLE_HOST="console-openshift-console.${DOMAIN}"
@@ -259,6 +270,17 @@ if [ "${DSC_PHASE}" = "Ready" ]; then
 else
   fail "DataScienceCluster: ${DSC_PHASE:-not found}"
 fi
+MS=$(oc get dscinitialization default-dsci -o jsonpath='{.status.conditions[?(@.type=="MonitoringStackAvailable")].status}' 2>/dev/null || echo "")
+if [ "${MS}" = "True" ]; then
+  pass "DSCI MonitoringStackAvailable (Observe & monitor metrics)"
+else
+  fail "DSCI MonitoringStackAvailable=${MS:-False} (Average compute consumption stays empty)"
+  if [ "${FIX}" -eq 1 ]; then
+    oc apply -f "${SCRIPT_DIR}/../manifests/operators/coo-subscription.yaml" || true
+    oc apply -f "${SCRIPT_DIR}/../manifests/operators/opentelemetry-subscription.yaml" || true
+    oc apply -f "${SCRIPT_DIR}/../manifests/rhoai/dscinitialization.yaml" || true
+  fi
+fi
 RHOAI_HOST="$(rhoai_dashboard_host)"
 if [ -n "${RHOAI_HOST}" ]; then
   CODE=$(curl -sk -o /dev/null -w '%{http_code}' "https://${RHOAI_HOST}/" 2>/dev/null || echo "000")
@@ -319,17 +341,100 @@ fi
 AUTH_OK=1
 for ns in ${DS_PROJECTS}; do
   if oc get sa workshop-infer -n "${ns}" &>/dev/null \
-     && oc get networkpolicy allow-openshift-ingress -n "${ns}" &>/dev/null; then
-    pass "workshop-infer SA and ingress NetworkPolicy in ${ns}"
+     && oc get networkpolicy allow-openshift-ingress -n "${ns}" &>/dev/null \
+     && oc get networkpolicy allow-from-openshift-monitoring -n "${ns}" &>/dev/null; then
+    pass "workshop-infer SA, ingress NP, and metrics scrape NP in ${ns}"
   else
     AUTH_OK=0
-    fail "workshop-infer SA or allow-openshift-ingress missing in ${ns}"
+    fail "workshop-infer SA or NetworkPolicy missing in ${ns} (Observe models stay No data)"
   fi
 done
+if ! oc get prometheusrule kserve-vllm-recording-rules -n "${PRESENTER_PROJECT}" &>/dev/null; then
+  AUTH_OK=0
+  fail "PrometheusRule kserve-vllm-recording-rules missing (Observe Deployed models stays No data)"
+else
+  pass "PrometheusRule kserve-vllm-recording-rules"
+fi
 if [ "${AUTH_OK}" -eq 0 ] && [ "${FIX}" -eq 1 ]; then
-  echo "        Re-applying inference-auth.yaml and networkpolicies.yaml..."
+  echo "        Re-applying inference-auth.yaml, networkpolicies.yaml, kserve-vllm-prometheusrule.yaml..."
   oc apply -f "${SCRIPT_DIR}/../manifests/projects/inference-auth.yaml" || true
   oc apply -f "${SCRIPT_DIR}/../manifests/projects/networkpolicies.yaml" || true
+  oc apply -f "${SCRIPT_DIR}/../manifests/projects/kserve-vllm-prometheusrule.yaml" || true
+fi
+
+CATALOG_CONN_OK=0
+for ns in ${DS_PROJECTS}; do
+  if oc get secrets -n "${ns}" -o json 2>/dev/null | \
+     CATALOG_OCI_HOST="${CATALOG_OCI_HOST}" \
+     CATALOG_OCI_CONNECTION_DISPLAY="${CATALOG_OCI_CONNECTION_DISPLAY}" \
+     python3 -c '
+import base64, json, os, sys
+host = os.environ["CATALOG_OCI_HOST"]
+display = os.environ["CATALOG_OCI_CONNECTION_DISPLAY"]
+data = json.load(sys.stdin)
+for secret in data.get("items") or []:
+    ann = secret.get("metadata", {}).get("annotations") or {}
+    if ann.get("opendatahub.io/connection-type-ref") != "oci-v1":
+        continue
+    raw = (secret.get("data") or {}).get("OCI_HOST")
+    got = base64.b64decode(raw).decode() if raw else ""
+    if got != host:
+        continue
+    if ann.get("openshift.io/display-name") != display:
+        sys.exit(1)
+    sys.exit(0)
+sys.exit(1)
+' ; then
+    CATALOG_CONN_OK=$((CATALOG_CONN_OK + 1))
+    pass "Catalog OCI connection ${CATALOG_OCI_CONNECTION_DISPLAY} in ${ns}"
+  else
+    fail "Catalog OCI connection ${CATALOG_OCI_CONNECTION_DISPLAY} missing in ${ns}"
+  fi
+done
+if [ "${CATALOG_CONN_OK}" -lt 3 ] && [ "${FIX}" -eq 1 ]; then
+  echo "        Creating ${CATALOG_OCI_CONNECTION_DISPLAY} in Data Science Projects..."
+  ensure_redhat_catalog_oci_connections || true
+fi
+
+INCLUSTER_CONN_OK=0
+for ns in ${DS_PROJECTS}; do
+  if oc get secrets -n "${ns}" -o json 2>/dev/null | \
+     INCLUSTER_OCI_HOST="${INCLUSTER_OCI_HOST}" \
+     INCLUSTER_OCI_CONNECTION_DISPLAY="${INCLUSTER_OCI_CONNECTION_DISPLAY}" \
+     python3 -c '
+import base64, json, os, sys
+host = os.environ["INCLUSTER_OCI_HOST"]
+display = os.environ["INCLUSTER_OCI_CONNECTION_DISPLAY"]
+data = json.load(sys.stdin)
+for secret in data.get("items") or []:
+    if secret.get("type") != "kubernetes.io/dockerconfigjson":
+        continue
+    ann = secret.get("metadata", {}).get("annotations") or {}
+    raw = (secret.get("data") or {}).get("OCI_HOST")
+    got = base64.b64decode(raw).decode() if raw else ""
+    if got != host:
+        continue
+    cfg_raw = (secret.get("data") or {}).get(".dockerconfigjson")
+    if not cfg_raw:
+        continue
+    cfg = json.loads(base64.b64decode(cfg_raw))
+    auths = cfg.get("auths") if isinstance(cfg.get("auths"), dict) else {}
+    if host not in auths:
+        continue
+    if ann.get("openshift.io/display-name") != display:
+        sys.exit(1)
+    sys.exit(0)
+sys.exit(1)
+' ; then
+    INCLUSTER_CONN_OK=$((INCLUSTER_CONN_OK + 1))
+    pass "In-cluster registry OCI connection ${INCLUSTER_OCI_CONNECTION_DISPLAY} in ${ns}"
+  else
+    fail "In-cluster registry OCI connection ${INCLUSTER_OCI_CONNECTION_DISPLAY} missing in ${ns}"
+  fi
+done
+if [ "${INCLUSTER_CONN_OK}" -lt 3 ] && [ "${FIX}" -eq 1 ]; then
+  echo "        Creating ${INCLUSTER_OCI_CONNECTION_DISPLAY} (dockerconfigjson) in Data Science Projects..."
+  ensure_incluster_registry_oci_connections || true
 fi
 
 section "5. CPU workbench"

@@ -8,6 +8,10 @@ spec:
   daemonsets: {}
   dcgmExporter:
     enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+      honorLabels: true
   dcgm:
     enabled: true
   devicePlugin: {}

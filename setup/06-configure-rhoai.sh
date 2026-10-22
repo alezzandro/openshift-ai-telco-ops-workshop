@@ -34,6 +34,21 @@ ensure_dsc_component() {
 
 echo "1. Applying DSCInitialization..."
 oc apply -f "${RHOAI_DIR}/dscinitialization.yaml"
+echo "   Waiting for DSCI metrics stack (Observe & monitor)..."
+METRICS_OK=0
+for i in $(seq 1 36); do
+  MS=$(oc get dscinitialization default-dsci -o jsonpath='{.status.conditions[?(@.type=="MonitoringStackAvailable")].status}' 2>/dev/null || echo "")
+  if [ "${MS}" = "True" ]; then
+    echo "  [OK] DSCI MonitoringStackAvailable"
+    METRICS_OK=1
+    break
+  fi
+  echo "  Attempt ${i}/36 — MonitoringStackAvailable=${MS:-?} (needs Cluster Observability Operator + metrics.storage)"
+  sleep 10
+done
+if [ "${METRICS_OK}" -ne 1 ]; then
+  echo "  [WARN] Monitoring stack not Ready yet. Observe & monitor GPU consumption stays empty until COO installs and DSCI reconciles."
+fi
 echo ""
 
 echo "2. Applying DataScienceCluster..."
@@ -106,6 +121,7 @@ oc apply -f "${PROJ_DIR}/resourcequotas.yaml"
 oc apply -f "${PROJ_DIR}/rbac.yaml"
 oc apply -f "${PROJ_DIR}/inference-auth.yaml"
 oc apply -f "${PROJ_DIR}/networkpolicies.yaml"
+oc apply -f "${PROJ_DIR}/kserve-vllm-prometheusrule.yaml"
 echo ""
 
 echo "5b. NemoGuardrails list API for Gen AI Playground (TrustyAI stays Removed)..."
@@ -184,5 +200,12 @@ for ns in ${DS_PROJECTS}; do
 done
 
 echo ""
+echo "9. Catalog OCI connections (shared registry.redhat.io pull host)..."
+ensure_redhat_catalog_oci_connections
+echo ""
+echo "10. In-cluster registry OCI connections (ImageStream ModelCars)..."
+ensure_incluster_registry_oci_connections
+echo ""
+
 echo "=== OpenShift AI configuration complete ==="
 echo "  No InferenceService was created. Register models in Model Registry, then deploy from the dashboard."

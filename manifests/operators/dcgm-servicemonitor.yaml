@@ -1,0 +1,23 @@
+# Cluster Prometheus scrape of NVIDIA DCGM Exporter (GPU util / VRAM).
+# ClusterPolicy also enables this ServiceMonitor; keeping the object in git
+# makes 05-configure-gpu.sh deterministic if the operator is slow to reconcile.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: nvidia-gpu-operator
+  labels:
+    app: nvidia-dcgm-exporter
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  namespaceSelector:
+    matchNames:
+      - nvidia-gpu-operator
+  endpoints:
+    - port: gpu-metrics
+      path: /metrics
+      interval: 15s
+      honorLabels: true

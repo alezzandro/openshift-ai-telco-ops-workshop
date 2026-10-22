@@ -28,7 +28,8 @@ GCP IPI cluster  (asia-southeast1)
           ▼
      NFD → nvidia.com/gpu.present=true
      GPU Operator → allocatable nvidia.com/gpu=4 or 2
-     DCGM exporter :9400 → user-workload Prometheus
+     DCGM exporter :9400 → ServiceMonitor → cluster Prometheus
+     DSCI metrics stack (COO) → OpenShift AI Observe & monitor
           │
           ▼
      HardwareProfiles + Kueue ResourceFlavors l4-gpu-4 / l4-gpu-2
@@ -102,7 +103,10 @@ LangChain memory notebook talks to an in-cluster vLLM predictor after C3.
 
 This lab’s HTPasswd users are `cluster-admin` so students can `oc login`
 without extra RoleBindings. Isolation is still ResourceQuota, Kueue,
-NetworkPolicy, and per-project tokens.
+NetworkPolicy, and per-project tokens. The 2 GPU tenant cap is an OpenShift
+`ResourceQuota` (`gpu-quota` on `telco-ran-ai` / `telco-core-ai`), not an
+OpenShift AI Settings form. Hardware profiles set per-deploy GPU requests;
+Kueue `ClusterQueue` `nominalQuota` is pool admission.
 
 ## Model Registry
 
@@ -121,9 +125,11 @@ then **AI hub → Registry → version → Deploy**. Presenters do not use the
 catalog **Deploy model** shortcut. C4 registers a Hugging Face snapshot from **S3** (demo bucket on
 [S4](https://github.com/rh-aiservices-bu/s4); production uses enterprise
 object storage). C4b registers a **ModelCar** OCI image built from
-`ibm-granite/granite-3.3-2b-instruct` into the in-cluster registry. Dashboard
-*Register and store* can also bake a ModelCar; this lab shows the UBI9
-Containerfile instead.
+`ibm-granite/granite-3.3-2b-instruct` into the in-cluster registry. The
+internal registry requires a `kubernetes.io/dockerconfigjson` OCI connection
+(`In-cluster registry`, host `image-registry.openshift-image-registry.svc:5000`);
+KServe injects that Secret as `imagePullSecrets`. Dashboard *Register and store*
+can also bake a ModelCar; this lab shows the UBI9 Containerfile instead.
 
 Docs: [Working with model registries](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/index),
 [Register a model from the model catalog](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_model_catalog/index).

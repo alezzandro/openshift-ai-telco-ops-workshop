@@ -96,7 +96,7 @@ PY
 
 if [ -z "${GCP_BASE_DOMAIN:-}" ]; then
   echo "  ERROR: could not parse Cloud DNS base domain from the credentials file." >&2
-  echo "         Set GCP_BASE_DOMAIN=vfq4m.gcp.redhatworkshops.io" >&2
+  echo "         Set GCP_BASE_DOMAIN to the existing Cloud DNS zone from the credentials dump." >&2
   exit 1
 fi
 
