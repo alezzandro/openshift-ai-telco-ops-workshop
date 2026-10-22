@@ -1,0 +1,116 @@
+# ServiceAccount used by the serving wizard (Require token authentication).
+# Token holders need get on InferenceServices in the same project.
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying_models
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workshop-infer
+  namespace: telco-ops-demo
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workshop-infer-view
+  namespace: telco-ops-demo
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+rules:
+  - apiGroups:
+      - serving.kserve.io
+    resources:
+      - inferenceservices
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workshop-infer-view
+  namespace: telco-ops-demo
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workshop-infer-view
+subjects:
+  - kind: ServiceAccount
+    name: workshop-infer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workshop-infer
+  namespace: telco-ran-ai
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workshop-infer-view
+  namespace: telco-ran-ai
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+rules:
+  - apiGroups:
+      - serving.kserve.io
+    resources:
+      - inferenceservices
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workshop-infer-view
+  namespace: telco-ran-ai
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workshop-infer-view
+subjects:
+  - kind: ServiceAccount
+    name: workshop-infer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workshop-infer
+  namespace: telco-core-ai
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workshop-infer-view
+  namespace: telco-core-ai
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+rules:
+  - apiGroups:
+      - serving.kserve.io
+    resources:
+      - inferenceservices
+    verbs:
+      - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workshop-infer-view
+  namespace: telco-core-ai
+  labels:
+    workshop.opendatahub.io/component: inference-auth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workshop-infer-view
+subjects:
+  - kind: ServiceAccount
+    name: workshop-infer

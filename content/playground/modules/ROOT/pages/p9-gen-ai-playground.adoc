@@ -1,0 +1,31 @@
+= P9. Gen AI Studio Playground and OpenShift MCP
+
+{rhoai_product} {rhoai_version} **Gen AI studio → Playground** is Technology Preview. MCP Catalog and MCP server for Red Hat OpenShift are Technology Preview. Not supported with Red Hat production SLAs; not recommended for production.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/index[Experimenting with models in the gen AI playground]
+
+This is **not** the student lab-guide URL you are reading now. Open **Gen AI studio → Playground** on the OpenShift AI dashboard.
+
+== Before you start
+
+Your Ministral (or other) deployment in **your** project must have:
+
+* **Add as AI asset endpoint** (use case `chat`)
+* `--max-model-len=24576` (not `8192`) plus `--enable-auto-tool-choice` and `--tool-call-parser=mistral`
+* Token authentication with `workshop-infer`
+
+`--max-model-len=8192` fails as soon as you enable OpenShift MCP tools. Playground injects the tool schemas (~12k input tokens) and requests 4096 output tokens. Edit the InferenceService arguments if you deployed P1 with 8192, wait until the predictor is Ready, then retry.
+
+== Exercise
+
+. Open **Gen AI studio → Playground**. Select **your** model.
+. Enable **openshift-mcp-server**. It is read-only (ClusterRole `view`). Do not ask it to create, patch, or delete anything.
+. Prompt:
+
+----
+Using OpenShift MCP tools, list nodes with the worker-gpu role. For each, say how many nvidia.com/gpu are allocatable. Do not guess — use the tools. Do not create, patch, or delete anything.
+----
+
+. Record the node names and allocatable GPU counts. A "no permission" reply with a tool error is RBAC on ServiceAccount `mcp-viewer` (ClusterRole `view` cannot list Nodes). Tell the facilitator; they re-apply `manifests/mcp/rbac.yaml`. A "no permission" reply *without* a tool call is usually the 8192 context failure from P1.
+
+Coordinate GPU use with the other tenant and with the facilitator. Delete playground-only experiments when you are done so P3–P5 still have L4s.

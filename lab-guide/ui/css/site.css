@@ -1,0 +1,54 @@
+:root {
+  --rh-red: #ee0000;
+  --ink: #151515;
+  --muted: #6a6e73;
+  --bg: #f5f5f5;
+  --card: #ffffff;
+  --border: #d2d2d2;
+  --link: #0066cc;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: RedHatText, "Red Hat Text", "Noto Sans", Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  line-height: 1.55;
+}
+.header { background: var(--ink); color: #fff; }
+.header-inner { max-width: 1200px; margin: 0 auto; padding: 0.85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; }
+.logo { color: #fff; text-decoration: none; font-weight: 600; }
+.header-note { color: #f0f0f0; font-size: 0.85rem; }
+.env-banner {
+  background: #e7f1fa;
+  border-bottom: 1px solid #bee1f4;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.92rem;
+}
+.env-banner a { color: var(--link); }
+.env-banner .env-grid { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; max-width: 1200px; margin: 0 auto; }
+.layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1200px; margin: 0 auto; min-height: 70vh; }
+.nav { background: var(--card); border-right: 1px solid var(--border); padding: 1rem; }
+.nav-heading { font-weight: 700; margin: 1rem 0 0.35rem; font-size: 0.85rem; text-transform: uppercase; color: var(--muted); }
+.nav ul { list-style: none; margin: 0; padding: 0; }
+.nav li { margin: 0.2rem 0; }
+.nav a { color: var(--ink); text-decoration: none; }
+.nav a:hover { color: var(--link); }
+.nav .is-current > a { color: var(--rh-red); font-weight: 600; }
+.main { padding: 1.5rem 2rem 3rem; background: var(--card); }
+.doc h1 { margin-top: 0; }
+.doc h2 { border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }
+.doc pre, .doc code { font-family: "Red Hat Mono", ui-monospace, monospace; font-size: 0.9em; }
+.doc pre { background: #151515; color: #f5f5f5; padding: 0.9rem; overflow: auto; }
+.doc table { border-collapse: collapse; width: 100%; }
+.doc th, .doc td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
+.doc .admonitionblock { margin: 1rem 0; padding: 0.75rem 1rem; border-left: 4px solid var(--rh-red); background: #fff5f5; }
+.doc .admonitionblock.note { border-left-color: var(--link); background: #e7f1fa; }
+.doc .admonitionblock.important { border-left-color: #f0ab00; background: #fff8e6; }
+.pagination { display: flex; justify-content: space-between; margin-top: 2rem; }
+.pagination a { color: var(--link); }
+.footer { text-align: center; font-size: 0.8rem; color: var(--muted); padding: 1rem; }
+@media (max-width: 800px) {
+  .layout { grid-template-columns: 1fr; }
+  .nav { border-right: 0; border-bottom: 1px solid var(--border); }
+}

@@ -1,0 +1,73 @@
+= C4. Hugging Face → S3 → deploy
+
+Time: about 12 minutes (weights were imported during setup).
+
+Same governed path as C3: **register a version in Model Registry workshop**, then **deploy that version**. This time the artifact is **not** a catalog ModelCar. It is a Hugging Face snapshot sitting in S3-compatible object storage.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_on_projects/using-connections_projects[Use connections]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry#registering-a-model-from-the-dashboard[Register a model from the dashboard]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying_models[Deploying models (OpenShift AI 3.5)]
+
+== Story
+
+Telco ops rarely consume only the curated catalog. A data-science team drops a Hugging Face model and asks serving to run it. The production pattern is:
+
+. Land the snapshot in **enterprise S3-compatible storage** (OpenShift Data Foundation / NooBaa, AWS S3, IBM Cloud Object Storage, and similar).
+. Create a project **connection** (endpoint, bucket, keys).
+. **Register** that location in Model Registry, then **deploy** from the registry.
+
+This lab uses **S4** (Super Simple Storage Service from Red Hat AI Services BU) as a **demo-only** S3 stand-in with a Hugging Face import button. S4 is **not** a Red Hat product, **not** certified storage, and **not** what you run in test or production. Replace it with the customer's object store before any real workload.
+
+https://github.com/rh-aiservices-bu/s4[S4 — Super Simple Storage Service]
+
+== Model
+
+* `Qwen/Qwen2.5-7B-Instruct` (Apache 2.0) from Hugging Face Hub
+* About 15 GB of weights — validated **1 × L4**
+* Setup already imported it to `s3://models/qwen2.5-7b-instruct/` on in-cluster S4
+* Connection name: `S4 workshop models (demo)` (`workshop-s4-models`)
+
+If Ministral from C3 is still running you now occupy **two** GPUs. That is fine on the 4-L4 node. Say it out loud.
+
+== 1. Show S4 (demo import)
+
+. Open the **S4 demo object storage** URL in the presenter banner. Log in with the S4 UI user from `./setup/show-credentials.sh`.
+. **Storage Management** — bucket `models`.
+. **Storage Browser** — prefix `qwen2.5-7b-instruct/` (config.json, safetensors, tokenizer). Setup pulled this with S4's **Import from HuggingFace** (or the seed Job). Do **not** start a second 15 GB import on stage.
+. Point at **Import from HuggingFace**: model ID + destination bucket/prefix. That is the click you would use for the *next* model. Large imports belong in setup, not in the 12-minute slot.
+
+Talking point: "In a customer environment this UI is the bucket console on OpenShift Data Foundation or the cloud S3 console. S4 exists so this cluster does not depend on a cloud account's object store."
+
+== 2. Connection (already created)
+
+. OpenShift AI → project `{presenter_project}` → **Connections**.
+. Confirm **S4 workshop models (demo)**: S3 compatible object storage, endpoint `http://s4.s4.svc.cluster.local:7480`, bucket `models`.
+. Students have the same connection in `{ran_project}` and `{core_project}`.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_data_in_an_s3-compatible_object_store/index[Working with data in an S3-compatible object store]
+
+== 3. Register from object storage
+
+. **AI hub → Registry**. Registry **workshop**. **Register model**.
+. Choose **Register** (metadata). Location type: **Object storage**.
+. Connection: **S4 workshop models (demo)**. Path: `qwen2.5-7b-instruct` (subdirectory — never the bucket root).
+. Model name: `qwen2-5-7b-instruct`. Version: `hf`. Format: `vLLM` / `1`.
+. **Register model**.
+
+== 4. Deploy the registered version
+
+. Version `hf` → ⋮ → **Deploy**. Project `{presenter_project}`.
+. Hardware profile: *NVIDIA L4 - 1 GPU*. Serving runtime: vLLM NVIDIA GPU.
+. Advanced settings: **Model access**, **Require token authentication** (`workshop-infer`). Optional **Add as AI asset endpoint**.
+. Custom runtime arguments (no leading space): `--max-model-len=8192`
+. Review → **Deploy**. Wait **Ready**.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry#deploying-a-model-version-from-a-model-registry[Deploy a model version from a model registry]
+
+== Test with curl
+
+Point `MODEL_URL` at the new Route and reuse `workshop-infer` (same pattern as C3). Ask the same prompt on Ministral and Qwen. Ops talking point: pack vs quality, not "pick a winner".
+
+Next: xref:c4b-modelcar.adoc[C4b. Package a Hugging Face model as a ModelCar] (skip on a 60-minute cut).

@@ -1,0 +1,7 @@
+# Workstation CLIs for GCP IPI + workshop setup.
+# oc and openshift-install are pinned separately by setup/00-install-tools.sh
+# (Red Hat mirror; not a mise package). gcloud is the Google Cloud SDK.
+
+[tools]
+jq = "latest"
+kubectl = "1.33"

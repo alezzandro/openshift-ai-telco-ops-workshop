@@ -1,0 +1,20 @@
+# UI only. Do not expose the S3 API (7480) on a Route.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: s4
+  namespace: s4
+  labels:
+    app: s4
+    workshop.opendatahub.io/component: s4
+spec:
+  to:
+    kind: Service
+    name: s4
+    weight: 100
+  port:
+    targetPort: web-ui
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

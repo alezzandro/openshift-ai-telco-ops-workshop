@@ -1,0 +1,12 @@
+.Welcome
+* xref:index.adoc[How to use the playground]
+* xref:lab-map.adoc[Lab map]
+* xref:playground-rules.adoc[Rules]
+
+.Exercises
+* xref:p1-p8-exercises.adoc[Exercises P1–P8]
+* xref:p9-gen-ai-playground.adoc[P9. Gen AI Studio Playground]
+* xref:p10-modelcar.adoc[P10. Custom ModelCar]
+
+.Reference
+* xref:overnight.adoc[Overnight]

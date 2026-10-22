@@ -1,0 +1,90 @@
+# S4 is a documented demo exception: Red Hat AI Services BU image, not a
+# certified Operator. Pin a version tag — never :latest.
+# https://github.com/rh-aiservices-bu/s4
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s4
+  namespace: s4
+  labels:
+    app: s4
+    workshop.opendatahub.io/component: s4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: s4
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: s4
+        workshop.opendatahub.io/component: s4
+    spec:
+      serviceAccountName: s4
+      securityContext:
+        runAsNonRoot: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+                  - key: node-role.kubernetes.io/worker-gpu
+                    operator: DoesNotExist
+      containers:
+        - name: s4
+          image: quay.io/rh-aiservices-bu/s4:0.3.2-2
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: s3-api
+              containerPort: 7480
+              protocol: TCP
+            - name: web-ui
+              containerPort: 5000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: s4-config
+            - secretRef:
+                name: s4-credentials
+          volumeMounts:
+            - name: s4-data
+              mountPath: /var/lib/ceph/radosgw
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          readinessProbe:
+            httpGet:
+              path: /api
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api
+              port: 5000
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: s4-data
+          persistentVolumeClaim:
+            claimName: s4-data

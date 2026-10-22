@@ -1,0 +1,26 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: lab-guide
+  namespace: lab-guide
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: lab-guide
+  namespace: lab-guide
+spec:
+  runPolicy: Serial
+  source:
+    type: Binary
+    binary: {}
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: lab-guide/Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: lab-guide:latest
+  successfulBuildsHistoryLimit: 3
+  failedBuildsHistoryLimit: 3

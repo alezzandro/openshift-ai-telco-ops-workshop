@@ -1,0 +1,85 @@
+= C2. Platform tour
+
+Time: about 15 minutes.
+
+== GPU inventory
+
+In the OpenShift console, **Compute → Nodes**. Filter or look for `worker-gpu`.
+
+Each GPU node should advertise `nvidia.com/gpu` allocatable **4**.
+
+Then in **OpenShift AI**, open **Observe & monitor → Infrastructure**. That page is the cluster accelerator view: GPU count, utilization, memory, hardware inventory, and Kueue queues (pool usage, workloads, borrowing).
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-observability_managing-rhoai[Manage observability]
+
+== Open WebUI as admin
+
+. Open **Open WebUI** from the banner.
+. Sign in with the admin email and password from `./setup/show-credentials.sh`.
+. Direct Connections stay disabled. Students will not use Open WebUI for inference.
+. Do **not** add a connection yet — there is no model until C3. C3 tests the authenticated **Route** with curl.
+
+== CPU workbench (LangChain + vLLM)
+
+Serving projects (`{presenter_project}`, `{ran_project}`, `{core_project}`) are Kueue-managed. The dashboard then shows **only hardware profiles that name a local queue**, so you cannot pick **CPU only** there. That is expected, not a broken profile.
+
+Setup created a separate Data Science Project **`{workbench_project}`** with **no** LocalQueue. The CPU workbench is already running there.
+
+. In OpenShift AI, open project `{workbench_project}` (display name *Telco Ops Notebooks*).
+. Workbenches → click the name **CPU LangChain examples** (opens JupyterLab).
+. In JupyterLab, open `START-HERE.md`, then
+  `llm-on-openshift/examples/notebooks/langchain/Langchain-vLLM-Prompt-memory.ipynb`.
+
+That notebook is from the Red Hat AIS examples repository
+https://github.com/rh-aiservices-bu/llm-on-openshift/blob/main/examples/notebooks/langchain/Langchain-vLLM-Prompt-memory.ipynb[Langchain-vLLM-Prompt-memory.ipynb].
+Setup cloned the repo onto the workbench PVC.
+
+Talking points:
+
+* A workbench is a Kubeflow `Notebook`. OpenShift AI 3.5 exposes it through the shared data-science gateway (same OpenShift identity as the console).
+* This one requests **CPU and memory only** (`cpu-only` HardwareProfile). It schedules on general workers, not on the tainted GPU node.
+* After C3, change `inference_server_url` to the in-cluster predictor Service in `{presenter_project}` (`http://<predictor>.{presenter_project}.svc.cluster.local:8080`). KServe Standard Services are headless — use container port 8080, not Service port 80. Do not use the Route from the notebook pod.
+
+Docs: https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_in_your_data_science_ide/working_in_jupyterlab[Working in JupyterLab]
+and https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-workloads-with-kueue[Managing workloads with Kueue].
+
+== Model Registry
+
+Setup created a Model Registry named **workshop** in `rhoai-model-registries`.
+
+. In OpenShift AI, **Settings → Model resources and operations → Model registry settings**. Confirm **workshop** is listed.
+. Open **AI hub → Registry** (label may be *Model registry*). The instance is **empty**. C3 registers the first model here; every later deploy starts from a registered version. Do not deploy from the catalog card in this lab.
+
+Talking points:
+
+* Catalog is discovery. Model Registry is the governed inventory (name, version, artifact URI). Serving pulls the URI the version recorded.
+* Model Registry is how platform teams version and share models instead of passing OCI tags in chat.
+* This lab uses the **default PostgreSQL (non-production)** database the operator generates. Red Hat does not support that database for production. Production registries use an external PostgreSQL 16.x or MySQL database.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_model_registries/creating-a-model-registry_managing-model-registries[Create a model registry]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry[Working with model registries]
+
+== MCP Catalog, MCP Registry, and the OpenShift MCP server (Technology Preview)
+
+These three surfaces are **Technology Preview**. They are not supported with Red Hat production SLAs and are not recommended for production.
+
+https://access.redhat.com/support/offerings/techpreview[Technology Preview Features Support Scope]
+
+. **AI hub → MCP servers → Catalog** — browse curated Model Context Protocol servers (Red Hat, partner, community). Confirm the **openshift-mcp-server** card. The Deploy action is live because setup set `mcplifecycleoperator: Managed` and `mcpCatalog: true`.
+. **AI hub → MCP servers → Deployments** (this is the MCP Registry surface; flag `mcpRegistry: true`). Select project `{presenter_project}`. Confirm **openshift-mcp-server** is **Available**.
+. That instance is the catalog **MCP server for Red Hat OpenShift**. It is **not** the Developer Preview `rhoai-mcp` coding-assistant server.
+
+Talking points:
+
+* The OpenShift MCP server is **read-only** (`core` + `config` toolsets). Its ServiceAccount `mcp-viewer` is bound to ClusterRole `view` (namespaced objects) plus a narrow ClusterRole for core **nodes** (C3b GPU inventory). Built-in `view` cannot list Nodes.
+* MCP Catalog / MCP Lifecycle Operator / MCP server for Red Hat OpenShift are Technology Preview. This lab does **not** install MCP Gateway.
+* Use this in the show as a catalog + deploy demo. Do not treat it as a production agent runtime.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_mcp_catalog/index[Working with the MCP catalog]
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_applications/mcp-server[MCP server for Red Hat OpenShift]
+
+**Gen AI studio** appears in the side nav because setup set `genAiStudio: true` and `ogx: Managed`. Do **not** create a playground yet — you need a Ready model that is an AI asset endpoint (C3 / C3b).
+
+Next: xref:c2b-onboard-mcp.adoc[C2b. Onboard your own MCP server] (optional on a 60-minute cut).

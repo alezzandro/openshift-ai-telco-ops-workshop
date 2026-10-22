@@ -1,0 +1,83 @@
+= Lab map
+
+== URLs
+
+The banner lists live Routes for this cluster. Typical set:
+
+* Presenter guide (this site)
+* Playground (student URL — different host; do not present from it)
+* OpenShift console
+* OpenShift AI dashboard (`rhods-dashboard`)
+* Open WebUI (presenter-only; students use the authenticated model Route)
+* Model Registry **workshop** (Settings → Model registry settings; **AI hub → Registry** is where you register versions and click Deploy)
+* MCP servers (AI hub → MCP servers — Catalog, Deployments, OpenShift MCP, and the **workshop-custom-mcp** catalog card; Technology Preview)
+* **Gen AI studio → Playground** (Technology Preview; C3b — not the student lab-guide URL)
+* S4 demo object storage (C4 Hugging Face → S3; not enterprise storage)
+
+== Projects
+
+[cols="1,2,1"]
+|===
+| Project | Role | GPU cap
+
+| `{presenter_project}`
+| Presenter Data Science Project (Kueue)
+| Shared pool (4 L4 on one node)
+
+| `{workbench_project}`
+| CPU Jupyter workbench (no Kueue)
+| 0 GPU
+
+| `{ran_project}`
+| Playground tenant A
+| ResourceQuota 2 GPU
+
+| `{core_project}`
+| Playground tenant B
+| ResourceQuota 2 GPU
+|===
+
+== Hardware
+
+Rehearsal (`full-setup.sh`) is **one** Google Cloud `g2-standard-48`:
+
+* 4 × NVIDIA L4, 24 GB each (96 GB total)
+* Label `node-role.kubernetes.io/worker-gpu` and `workshop.opendatahub.io/l4-count=4`
+* Taint `nvidia.com/gpu=True:NoSchedule`
+
+Class day (`./setup/scale-students.sh`) adds three `g2-standard-24` (2 L4 each; 10 L4 / 240 GB total). Do not add a second 4-L4 node.
+
+NVIDIA L4 has **no MIG** and **no NVLink**. Isolation is a whole GPU. Tensor parallelism on this shape uses NCCL over PCIe.
+
+Packing: on the rehearsal node, C3+C4 share it; C6 2-GPU tensor parallel uses half; a 4-GPU stretch consumes the whole node. On class day, C6 uses a **whole 2-L4 node**; the 4-GPU stretch stays on the 4-L4 node.
+
+HardwareProfiles in the dashboard:
+
+* *NVIDIA L4 - 1 GPU* — catalog and quantized models
+* *NVIDIA L4 - 2 GPU tensor parallel* — set `--tensor-parallel-size=2`
+* *NVIDIA L4 - 4 GPU tensor parallel* — whole node; playground stretch only
+* *CPU only* — workbenches so a notebook cannot steal an L4
+
+== GPU choreography
+
+Never overlap two large services. Delete or stop the previous InferenceService before the next size class.
+
+[cols="1,1"]
+|===
+| Segment | Occupancy
+
+| Ministral 14B catalog
+| 1 GPU
+
+| Custom 7B from S3 (C4)
+| 1 GPU (or keep Ministral + one small replica)
+
+| Granite 2B ModelCar (C4b)
+| 1 GPU (optional; still 1 × L4)
+
+| 24B FP8 tensor parallel
+| 2 GPUs (delete previous large service)
+
+| Isolation playground
+| 1+1 GPU in two projects
+|===

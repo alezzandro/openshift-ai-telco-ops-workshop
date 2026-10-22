@@ -1,0 +1,37 @@
+# Credentials and generated secrets
+setup/.generated-credentials.env
+*.env
+!lab-guide/**
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Container / Antora build artifacts
+context/
+lab-guide/www/
+content/www/
+www/
+
+# Cursor
+.cursor/
+agent-tools/
+
+# Presenter-only notes (customer and internal material)
+private/
+
+# GCP IPI artifacts from setup/01-install-cluster.sh (kubeconfig, terraform, logs, SA JSON)
+/cluster/

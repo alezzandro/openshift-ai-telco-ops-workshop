@@ -1,0 +1,11 @@
+= Overnight
+
+GPU nodes may be scaled to zero overnight (this Google Cloud sandbox does not autostop). This playground site, Open WebUI, the CPU workbench, and Model Registry stay on general workers. Console login is `studentN` (the facilitator has the password; it is not in this banner).
+
+== Evening
+
+Delete **your** InferenceServices so you are not holding GPUs. Leave Model Registry entries.
+
+== Morning
+
+If the GPU node is still coming up, **wait**. Do not create extra InferenceServices. Check OpenShift AI **Observe & monitor → Infrastructure**. Ask the facilitator if a deploy stays Pending.

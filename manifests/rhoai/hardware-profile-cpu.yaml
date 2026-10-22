@@ -1,0 +1,31 @@
+# CPU-only profile so a light workbench cannot steal an L4 during the show.
+apiVersion: infrastructure.opendatahub.io/v1
+kind: HardwareProfile
+metadata:
+  name: cpu-only
+  namespace: redhat-ods-applications
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/dashboard-feature-visibility: '["workbench"]'
+    opendatahub.io/display-name: "CPU only"
+    opendatahub.io/description: "No GPU. Use for workbenches during this serving workshop."
+    opendatahub.io/disabled: "false"
+    opendatahub.io/managed: "false"
+spec:
+  identifiers:
+    - displayName: CPU
+      identifier: cpu
+      resourceType: CPU
+      defaultCount: 2
+      minCount: 1
+      maxCount: 4
+    - displayName: Memory
+      identifier: memory
+      resourceType: Memory
+      defaultCount: 8Gi
+      minCount: 4Gi
+      maxCount: 16Gi
+  scheduling:
+    type: Node
+    node: {}

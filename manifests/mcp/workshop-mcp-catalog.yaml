@@ -1,0 +1,79 @@
+# Example custom MCP catalog. Same schema as the Red Hat MCP catalog.
+# Replace artifacts.uri with your UBI9 MCP image from your registry.
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_mcp_catalog/index
+source: Workshop custom
+mcp_servers:
+  - name: workshop-custom-mcp
+    provider: Workshop
+    license: apache-2.0
+    license_link: https://www.apache.org/licenses/LICENSE-2.0
+    description: >-
+      Workshop example of onboarding your own MCP server. The payload image is
+      the certified MCP server for Red Hat OpenShift so this lab stays on
+      registry.redhat.io. In production, point artifacts.uri at the image you
+      build on UBI9.
+    readme: |-
+      # Workshop custom MCP (example)
+
+      This catalog entry shows how a platform team publishes **their** MCP
+      server into the AI Hub MCP Catalog.
+
+      1. Build the server as a container (UBI9, listen on HTTP `/mcp`).
+      2. Push it to a registry the cluster can pull.
+      3. Add a catalog YAML with `artifacts.uri`, port, and ServiceAccount.
+      4. Users deploy from **AI hub → MCP servers → Catalog**.
+
+      This lab uses `registry.redhat.io/openshift-mcp-tech-preview/openshift-mcp-server-rhel9:0.4`
+      as the stand-in image (Technology Preview, read-only).
+    version: "0.4"
+    transports:
+      - http
+      - sse
+    documentationUrl: https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_applications/mcp-server
+    repositoryUrl: https://github.com/openshift/openshift-mcp-server
+    publishedDate: "2026-10-20T00:00:00Z"
+    deploymentMode: local
+    tools:
+      - name: pods_list
+        description: List pods (read-only). Replace this list with your server's tools.
+        accessType: read_only
+        parameters: []
+      - name: configuration_view
+        description: View kubeconfig context (read-only example tool).
+        accessType: read_only
+        parameters: []
+    artifacts:
+      - uri: oci://registry.redhat.io/openshift-mcp-tech-preview/openshift-mcp-server-rhel9:0.4
+    runtimeMetadata:
+      defaultArgs:
+        - --config
+        - /etc/mcp-config/config.toml
+      defaultPort: 8080
+      mcpPath: /mcp
+      prerequisites:
+        configMaps:
+          - name: workshop-custom-mcp-config
+            mountAsFile: true
+            mountPath: /etc/mcp-config
+            description: Optional configuration for MCP server settings
+            keys:
+              - key: config.toml
+                required: false
+                description: Server configuration file
+                defaultContent: |
+                  log_level = 5
+                  port = "8080"
+                  read_only = true
+                  toolsets = ["core", "config"]
+        serviceAccount:
+          required: true
+          suggestedName: mcp-viewer
+          hint: Needs ClusterRole view plus get/list on core nodes for GPU inventory
+    securityIndicators:
+      readOnlyTools: true
+      secureEndpoint: true
+      verifiedSource: true
+    customProperties:
+      supportTier:
+        metadataType: MetadataStringValue
+        string_value: "communitySupported"

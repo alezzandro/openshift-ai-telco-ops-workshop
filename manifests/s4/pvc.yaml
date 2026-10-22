@@ -1,0 +1,16 @@
+# 80 Gi holds Qwen2.5-7B (~15 Gi) plus RGW metadata. Granite ModelCar is an
+# ImageStream, not this PVC.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s4-data
+  namespace: s4
+  labels:
+    app: s4
+    workshop.opendatahub.io/component: s4
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 80Gi

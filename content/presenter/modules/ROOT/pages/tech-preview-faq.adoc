@@ -1,0 +1,70 @@
+= Technology Preview FAQ
+
+== What we recommend in production (GA)
+
+. Right-size the model to the use case.
+. Quantize (for example W4A16 / FP8) and cap `--max-model-len`.
+. If you still need more VRAM, **single-node tensor parallelism** (`--tensor-parallel-size=N`, N GPUs on **one** node).
+
+That is what this lab demonstrated.
+
+== What exists but we do not run here
+
+{rhoai_product} {rhoai_version} includes a topology selector for distributed inference with llm-d:
+
+* Single-node (always available)
+* Multi-node data-parallel (more *copies* of a model that already fits)
+* Single-node and multi-node disaggregated prefill/decode
+
+The last patterns need **RDMA-class** networking (for example RoCE or InfiniBand). This Google Cloud G2 L4 lab does not have that fabric. Disaggregated prefill/decode on OpenShift is **Technology Preview**.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploy_models_using_distributed_inference_with_llm-d/index[Deploy models using Distributed Inference with llm-d]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploy_models_using_distributed_inference_with_llm-d/llmd-configuring-pd-disaggregation_distributed-inference[Configure disaggregated prefill-decode (Technology Preview)]
+
+https://access.redhat.com/support/offerings/techpreview[Technology Preview Features Support Scope]
+
+== Required phrases
+
+* "Not supported with Red Hat production SLAs; not recommended for production."
+* "This Google Cloud G2 L4 lab cannot demonstrate multi-node disaggregated inference."
+* "GA recommendation for huge models: right-size, quantize, then single-node tensor parallel."
+
+== MCP Catalog, MCP Registry, MCP Lifecycle Operator
+
+{rhoai_product} {rhoai_version} ships an AI Hub **MCP Catalog** and an **MCP Registry** tab. Deploying from the catalog needs the **MCP Lifecycle Operator** (`mcplifecycleoperator: Managed`) plus dashboard flags `mcpCatalog` and `mcpRegistry`.
+
+This lab deploys the catalog server **MCP server for Red Hat OpenShift** (`openshift-mcp-server`) into `{presenter_project}` with read-only tools, ClusterRole `view`, and a narrow ClusterRole so `mcp-viewer` can list Nodes (C3b). That is **not** the Developer Preview `rhoai-mcp` server for coding assistants.
+
+Required phrases:
+
+* "MCP Catalog, MCP Lifecycle Operator, and MCP server for Red Hat OpenShift are Technology Preview."
+* "Not supported with Red Hat production SLAs; not recommended for production."
+* "This lab does not install MCP Gateway."
+* "A custom catalog source is how you onboard *your* MCP. The Settings YAML editor for MCP catalogs is Developer Preview; this lab uses the ConfigMap."
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_mcp_catalog/index[Working with the MCP catalog]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_mcp_catalog/enabling-mcp-lifecycle-management[Enable MCP server lifecycle management]
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_applications/mcp-server[MCP server for Red Hat OpenShift]
+
+== Gen AI Studio Playground
+
+{rhoai_product} {rhoai_version} **Gen AI studio → Playground** is Technology Preview. It needs `genAiStudio: true`, DataScienceCluster `ogx: Managed`, a model marked as an AI asset endpoint, and (for MCP) ConfigMap `gen-ai-aa-mcp-servers`. Chat also lists `NemoGuardrails`; this lab keeps TrustyAI Removed and installs only that CRD so an empty list succeeds.
+
+This is **not** the student lab-guide Playground URL.
+
+Required phrases:
+
+* "Gen AI playground is Technology Preview."
+* "Not supported with Red Hat production SLAs; not recommended for production."
+* "OGX operator, not LlamaStack."
+* "The OpenShift MCP server in the playground is read-only."
+* Ministral on 1 × L4 needs `--max-model-len=24576` for MCP (tool schemas ~12k tokens plus OGX `max_tokens` 4096). `8192` returns `[invalid_prompt]`. KV on that GPU is ~28k tokens, so 24576 still fits.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/index[Experimenting with models in the gen AI playground]
+
+== llm-d Endpoint Picker
+
+If someone asks about intelligent prefix-cache routing: the live path in many labs is Service load balancing plus per-replica `--enable-prefix-caching`. Endpoint Picker numbers are leave-behind unless re-validated on *this* cluster. Do not enable InferencePool on a Models-as-a-Service HTTPRoute unless that path has been proven.

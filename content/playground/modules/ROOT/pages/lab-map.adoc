@@ -1,0 +1,50 @@
+= Lab map
+
+== URLs
+
+The banner lists live Routes for this cluster:
+
+* OpenShift console
+* OpenShift AI dashboard — including **Gen AI studio → Playground** (Technology Preview; not this lab-guide URL)
+* Your model's authenticated Route (curl / Python; not Open WebUI Direct Connections)
+
+== Your project
+
+Work only in the Data Science Project you were assigned:
+
+[cols="1,2,1"]
+|===
+| Project | Role | GPU cap
+
+| `{ran_project}`
+| Playground tenant A
+| ResourceQuota 2 GPU
+
+| `{core_project}`
+| Playground tenant B
+| ResourceQuota 2 GPU
+
+| `{workbench_project}`
+| CPU Jupyter workbench (shared, no GPU)
+| 0 GPU
+|===
+
+Do not deploy into `{presenter_project}` — that is the facilitator project.
+
+== Hardware
+
+Rehearsal starts with one Google Cloud `g2-standard-48` (4 × NVIDIA L4). The facilitator may run `./setup/scale-students.sh` to add three `g2-standard-24` (2 L4 each).
+
+* Isolation is a **whole GPU**. NVIDIA L4 has no MIG.
+* A 4-GPU stretch stays on the presenter 4-L4 node. A 2-GPU tensor-parallel deploy uses a whole 2-L4 node on class day.
+
+HardwareProfiles:
+
+* *NVIDIA L4 - 1 GPU* — default for P1, P2, P5–P7
+* *NVIDIA L4 - 2 GPU tensor parallel* — P3 only, coordinate with the other tenant
+* *NVIDIA L4 - 4 GPU tensor parallel* — stretch only; delete it immediately when done
+* *CPU only* — workbenches in `{workbench_project}` only
+
+== GPU courtesy
+
+Never overlap two large services. Delete or stop your previous InferenceService before the next size class. Registry entries can stay.

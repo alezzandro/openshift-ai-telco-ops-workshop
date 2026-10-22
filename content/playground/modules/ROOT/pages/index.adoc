@@ -1,0 +1,31 @@
+= How to use the playground
+
+This site is the **student playground**. Work in the Data Science Project the facilitator assigned (`{ran_project}` or `{core_project}`).
+
+The blue banner at the top is filled from this cluster. Use those links; do not copy hostnames from an older lab.
+
+== What you will do
+
+. Read xref:playground-rules.adoc[Rules].
+. Register a model version in Model Registry **workshop**, then deploy that version from **AI hub → Registry** (not the catalog **Deploy** button).
+. Call your model from a laptop with the **external Route** and a `workshop-infer` token (curl or Python). Do not use Open WebUI Direct Connections.
+. Work through xref:p1-p8-exercises.adoc[exercises P1–P8], then xref:p9-gen-ai-playground.adoc[P9] (**Gen AI studio → Playground** plus OpenShift MCP — Technology Preview).
+
+== What you will operate
+
+* {rhoai_product} {rhoai_version} dashboard
+* Model Registry **workshop**
+* Your model's authenticated OpenShift Route (curl / Python)
+* OpenShift AI **Observe & monitor → Infrastructure**
+
+You will *not* load GGUF files into Open WebUI. You will *not* edit operators or MachineSets.
+
+== Official names
+
+Use **Red Hat OpenShift** and **Red Hat OpenShift AI**. This lab is serving operations, not RAN CNFs and not model training.
+
+== Docs
+
+* https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/[OpenShift AI 3.5]
+* https://docs.redhat.com/en/documentation/red_hat_ai/3/html/validated_models/model-support-matrix_validated-models[Validated model matrix]
+* https://access.redhat.com/support/offerings/techpreview[Technology Preview support scope]

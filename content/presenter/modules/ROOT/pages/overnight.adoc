@@ -1,0 +1,31 @@
+= Overnight and morning
+
+GPU nodes are the expensive part. This lab guide, Open WebUI, the CPU workbench, Model Registry, the OpenShift MCP server, and S4 (demo object storage) stay on general workers. This Google Cloud sandbox does **not** autostop.
+
+== Evening (facilitator)
+
+----
+./setup/overnight-stop.sh
+----
+
+That stops leftover InferenceServices (registry entries stay), scales both GPU pools to 0 (VMs are deleted), pauses Machine API, then stops the remaining GCP VMs. Do not stop GPU VMs out-of-band while a GPU MachineSet still has replicas > 0. Use `--reset` only if you also want workshop PVCs wiped.
+
+== Morning (facilitator)
+
+----
+./setup/overnight-start.sh
+./setup/overnight-start.sh --4l4 1
+./setup/overnight-start.sh --students
+./setup/show-credentials.sh
+----
+
+Default GPU counts are the last saved values. `--students` is `--4l4 1 --2l4 3`.
+
+`health-check.sh --fix` restores per-pool last replicas only. It does not start stopped VMs.
+
+If the Machine event is `ZONE_RESOURCE_POOL_EXHAUSTED`, move the GPU pools: `./setup/switch-gpu-az.sh --list` then `./setup/switch-gpu-az.sh --try asia-southeast1-a,asia-southeast1-b,asia-southeast1-c`.
+
+== Students
+
+If the GPU node is still coming up, wait. Do not spam additional InferenceServices.
+Console login is `admin` or `studentN` (passwords are not in this banner).

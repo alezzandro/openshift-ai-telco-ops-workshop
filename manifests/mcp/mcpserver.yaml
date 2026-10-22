@@ -1,0 +1,51 @@
+# Technology Preview: MCP server for Red Hat OpenShift from the AI Hub MCP Catalog.
+# Image, port, path, config.toml, and mcp-viewer + ClusterRole view match catalog metadata.
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_mcp_catalog/deploying-and-managing-mcp-servers
+# https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_applications/mcp-server
+# https://access.redhat.com/support/offerings/techpreview
+apiVersion: mcp.x-k8s.io/v1alpha1
+kind: MCPServer
+metadata:
+  name: openshift-mcp-server
+  namespace: telco-ops-demo
+  labels:
+    app: openshift-mcp-server
+    workshop.opendatahub.io/component: mcp
+    opendatahub.io/dashboard: "true"
+  annotations:
+    openshift.io/display-name: "MCP server for Red Hat OpenShift"
+    openshift.io/description: "Technology Preview. Read-only cluster inspect (core + config toolsets)."
+spec:
+  source:
+    type: ContainerImage
+    containerImage:
+      ref: registry.redhat.io/openshift-mcp-tech-preview/openshift-mcp-server-rhel9:0.4
+  config:
+    port: 8080
+    path: /mcp
+    arguments:
+      - --config
+      - /etc/mcp-config/config.toml
+    storage:
+      - path: /etc/mcp-config
+        permissions: ReadOnly
+        source:
+          type: ConfigMap
+          configMap:
+            name: openshift-mcp-server-config
+  mcp:
+    stateless: true
+  runtime:
+    replicas: 1
+    security:
+      serviceAccountName: mcp-viewer
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: "1"
+        memory: 512Mi
+  extraLabels:
+    app: openshift-mcp-server
+    workshop.opendatahub.io/component: mcp

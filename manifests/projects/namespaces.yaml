@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: telco-ops-demo
+  labels:
+    opendatahub.io/dashboard: "true"
+    modelmesh-enabled: "false"
+    kueue.openshift.io/managed: "true"
+    workshop.opendatahub.io/tenant: "ops"
+  annotations:
+    openshift.io/display-name: "Telco Ops Demo (presenter)"
+    openshift.io/description: "Presenter Data Science Project for the OpenShift AI ops workshop"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: telco-ran-ai
+  labels:
+    opendatahub.io/dashboard: "true"
+    modelmesh-enabled: "false"
+    kueue.openshift.io/managed: "true"
+    workshop.opendatahub.io/tenant: "ran"
+  annotations:
+    openshift.io/display-name: "Telco RAN AI (playground)"
+    openshift.io/description: "Playground tenant A — 2 GPU ResourceQuota"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: telco-core-ai
+  labels:
+    opendatahub.io/dashboard: "true"
+    modelmesh-enabled: "false"
+    kueue.openshift.io/managed: "true"
+    workshop.opendatahub.io/tenant: "core"
+  annotations:
+    openshift.io/display-name: "Telco Core AI (playground)"
+    openshift.io/description: "Playground tenant B — 2 GPU ResourceQuota"
+---
+# No kueue.openshift.io/managed label: the dashboard then shows Node-type
+# HardwareProfiles (CPU only). Kueue serving projects hide those profiles.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: telco-ops-notebooks
+  labels:
+    opendatahub.io/dashboard: "true"
+    modelmesh-enabled: "false"
+    workshop.opendatahub.io/tenant: "notebooks"
+  annotations:
+    openshift.io/display-name: "Telco Ops Notebooks (CPU workbench)"
+    openshift.io/description: "CPU-only Data Science Project for a Jupyter workbench. No Kueue LocalQueue, so it cannot steal L4 GPUs from serving."

@@ -1,0 +1,18 @@
+# Optional ConfigMaps the Gen AI Playground BFF reads per Data Science Project.
+# Missing entries log ERROR but are not the chat HTTP 500. Empty objects keep
+# those reads quiet. Applied into each DS project by setup/08.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gen-ai-aa-vector-stores
+  labels:
+    workshop.opendatahub.io/component: gen-ai-playground
+data: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gen-ai-aa-custom-model-endpoints
+  labels:
+    workshop.opendatahub.io/component: gen-ai-playground
+data: {}

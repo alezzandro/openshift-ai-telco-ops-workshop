@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lab-guide
+  namespace: lab-guide
+  labels:
+    app: lab-guide
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lab-guide
+  template:
+    metadata:
+      labels:
+        app: lab-guide
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      containers:
+        - name: httpd
+          image: image-registry.openshift-image-registry.svc:5000/lab-guide/lab-guide:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: env
+              mountPath: /opt/app-root/src/presenter/env.json
+              subPath: env.json
+            - name: env-playground
+              mountPath: /opt/app-root/src/playground/env.json
+              subPath: env.json
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /index.html
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: env
+          configMap:
+            name: lab-guide-env
+        - name: env-playground
+          configMap:
+            name: lab-guide-env
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lab-guide
+  namespace: lab-guide
+  labels:
+    app: lab-guide
+spec:
+  selector:
+    app: lab-guide
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: lab-guide
+  namespace: lab-guide
+  labels:
+    app: lab-guide
+spec:
+  to:
+    kind: Service
+    name: lab-guide
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: playground
+  namespace: lab-guide
+  labels:
+    app: lab-guide
+    workshop.opendatahub.io/audience: playground
+spec:
+  to:
+    kind: Service
+    name: lab-guide
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

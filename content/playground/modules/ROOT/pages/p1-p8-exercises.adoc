@@ -1,0 +1,92 @@
+= Playground exercises P1–P8
+
+Work in `{ran_project}` or `{core_project}` as assigned. Use Hardware profile *NVIDIA L4 - 1 GPU* unless an exercise says otherwise.
+
+Every serving exercise uses the same path as the guided demo: **register a version in Model Registry workshop**, then **deploy that version** into *your* project. Do not use the catalog **Deploy model** button.
+
+== P1. Catalog → registry → deploy
+
+From **AI hub → Models → Catalog**, open Ministral 3 14B Instruct and **Register model** into **workshop** (skip if the presenter already registered it). Then **AI hub → Registry** → that version → **Deploy** into your project.
+
+Advanced settings: **Add as AI asset endpoint** (use case `chat`), **Model access**, **Require token authentication** with service account `workshop-infer`, runtime args `--max-model-len=24576`, `--enable-auto-tool-choice`, `--tool-call-parser=mistral` (needed for xref:p9-gen-ai-playground.adoc[P9]). `--max-model-len=8192` is too small once Playground injects OpenShift MCP tool schemas.
+
+Call the model from your laptop (not Open WebUI). Copy the external endpoint from **AI hub → Deployments**, then:
+
+----
+export MODEL_URL=https://$(oc get route -n <your-project> -l inferenceservice-name=<is-name> -o jsonpath='{.items[0].spec.host}')
+export TOKEN=$(oc create token workshop-infer -n <your-project> --duration=8h)
+
+curl -sk -H "Authorization: Bearer ${TOKEN}" "${MODEL_URL}/v1/models"
+
+curl -sk -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+  "${MODEL_URL}/v1/chat/completions" \
+  -d '{"model":"ministral-3-14b-instruct-version","messages":[{"role":"user","content":"What is tensor parallelism in one sentence?"}],"max_tokens":64}'
+----
+
+Same call in Python (stdlib):
+
+----
+python3 - <<'PY'
+import json, os, ssl, urllib.request
+url, token = os.environ["MODEL_URL"], os.environ["TOKEN"]
+req = urllib.request.Request(
+    f"{url}/v1/chat/completions",
+    data=json.dumps({
+        "model": "ministral-3-14b-instruct-version",
+        "messages": [{"role": "user", "content": "What is tensor parallelism in one sentence?"}],
+        "max_tokens": 64,
+    }).encode(),
+    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    method="POST",
+)
+print(json.load(urllib.request.urlopen(req, context=ssl._create_unverified_context())))
+PY
+----
+
+A request without `Authorization` must return **401**. Do not paste `*.svc.cluster.local` into Open WebUI Direct Connections.
+
+== P2. Hugging Face model from S3
+
+Setup imported `Qwen/Qwen2.5-7B-Instruct` into the demo S4 bucket. Your project already has connection **S4 workshop models (demo)**.
+
+. **AI hub → Registry** → **Register model**. Location: **Object storage**, connection **S4 workshop models (demo)**, path `qwen2.5-7b-instruct`. Format `vLLM`, version `hf`.
+. Deploy into *your* project with *NVIDIA L4 - 1 GPU*, **Model access**, token auth (`workshop-infer`), `--max-model-len=8192`.
+. Curl the Route like P1. Coordinate GPUs with the other tenant.
+
+S4 is **demo-only**. Outside this lab the same wizard points at enterprise S3-compatible storage (OpenShift Data Foundation, AWS S3, and similar).
+
+Stretch: xref:p10-modelcar.adoc[P10. Custom ModelCar].
+
+== P3. Tensor parallel
+
+Delete previous large services (keep registry entries). Register Mistral Small 3.1 24B FP8 (catalog card, or URI
+`oci://registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503-fp8-dynamic:1.5`)
+then deploy with *2 GPU tensor parallel* and `--tensor-parallel-size=2` (keep **Model access** and token auth). Confirm two GPUs show memory in OpenShift AI **Observe & monitor → Infrastructure**. Re-point `MODEL_URL` at the new Route and curl again.
+
+On rehearsal this shares the presenter 4-L4 node. On class day it uses a whole 2-L4 node. Coordinate with the other tenant.
+
+== P4. The 70B lesson
+
+Open the catalog card for a 70B-class FP16 model (min vRAM ~162 GB). Do **not** register it and do **not** force it onto 4 × 24 GB. Write down why it cannot fit 96 GB (weights plus KV cache). That is the right-size lesson.
+
+== P5. Horizontal scale and queue
+
+From the Registry, deploy (or edit) Ministral 14B on 1 GPU with `minReplicas=2`. Try a third replica. Watch Kueue / Pending. Rehearsal has 4 GPUs until the facilitator runs `./setup/scale-students.sh`.
+
+== P6. Isolation
+
+From the other project, deploy the **same** registered Ministral version. Prove you cannot see the other team's InferenceService in **your** OpenShift AI project. Curl *their* Route with *your* `workshop-infer` token — expect **401**. Isolation is the Data Science Project, quota, NetworkPolicy, and token auth.
+
+== P7. `max-model-len`
+
+Change `--max-model-len` on a 1-GPU model and watch VRAM / KV in metrics. Context length is an ops control on L4.
+
+== P8. Return capacity
+
+Delete all of *your* InferenceServices. Confirm you are not holding `nvidia.com/gpu`. Leave Model Registry entries; the next class can deploy the same versions.
+
+Stretch: from **AI hub → MCP servers → Catalog**, inspect **workshop-custom-mcp** (the custom catalog example from C2b). Do **not** deploy a second cluster-inspect MCP without the facilitator. MCP Catalog is Technology Preview.
+
+Stretch (coordinate): 24B BF16 on 4 GPUs — register the URI first, then delete the InferenceService so the other tenant can work.
+
+Continue with xref:p9-gen-ai-playground.adoc[P9. Gen AI Studio Playground and OpenShift MCP].

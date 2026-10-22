@@ -1,0 +1,42 @@
+apiVersion: infrastructure.opendatahub.io/v1
+kind: HardwareProfile
+metadata:
+  name: gpu-l4-2-tp
+  namespace: redhat-ods-applications
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/dashboard-feature-visibility: '["model-serving"]'
+    opendatahub.io/display-name: "NVIDIA L4 - 2 GPU tensor parallel"
+    opendatahub.io/description: "Two NVIDIA L4 GPUs on one node. Set --tensor-parallel-size=2"
+    opendatahub.io/disabled: "false"
+    opendatahub.io/managed: "false"
+spec:
+  identifiers:
+    - displayName: CPU
+      identifier: cpu
+      resourceType: CPU
+      defaultCount: 8
+      minCount: 4
+      maxCount: 16
+    - displayName: Memory
+      identifier: memory
+      resourceType: Memory
+      defaultCount: 32Gi
+      minCount: 16Gi
+      maxCount: 64Gi
+    - displayName: NVIDIA GPU
+      identifier: nvidia.com/gpu
+      resourceType: Accelerator
+      defaultCount: 2
+      minCount: 2
+      maxCount: 2
+  scheduling:
+    type: Node
+    node:
+      nodeSelector:
+        node-role.kubernetes.io/worker-gpu: ""
+      tolerations:
+        - effect: NoSchedule
+          key: nvidia.com/gpu
+          operator: Exists

@@ -1,0 +1,97 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-s4
+  namespace: s4
+  labels:
+    app: s4
+    workshop.opendatahub.io/component: s4
+spec:
+  podSelector:
+    matchLabels:
+      app: s4
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-ingress
+      ports:
+        - protocol: TCP
+          port: 5000
+    # Seed Job and in-namespace probes (same-namespace is not implicit).
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5000
+        - protocol: TCP
+          port: 7480
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              workshop.opendatahub.io/tenant: ops
+        - namespaceSelector:
+            matchLabels:
+              workshop.opendatahub.io/tenant: ran
+        - namespaceSelector:
+            matchLabels:
+              workshop.opendatahub.io/tenant: core
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: telco-ops-demo
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: telco-ran-ai
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: telco-core-ai
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-applications
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: knative-serving
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kserve
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: s4
+      ports:
+        - protocol: TCP
+          port: 7480
+        - protocol: TCP
+          port: 5000
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+    # Hugging Face Hub + quay.io (image already cached) + S3 self
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 7480
+        - protocol: TCP
+          port: 5000

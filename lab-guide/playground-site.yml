@@ -1,0 +1,21 @@
+site:
+  title: Playground
+  start_page: modules::index.adoc
+
+content:
+  sources:
+    - url: ..
+      start_path: content/playground
+      worktrees: true
+
+ui:
+  bundle:
+    url: ./ui-bundle.zip
+    snapshot: true
+
+runtime:
+  fetch: false
+  cache_dir: ./.cache/antora-playground
+
+output:
+  dir: ./www/playground

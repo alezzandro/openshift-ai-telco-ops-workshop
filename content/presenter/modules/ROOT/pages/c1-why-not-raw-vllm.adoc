@@ -1,0 +1,32 @@
+= C1. Why not raw vLLM on Kubernetes
+
+Time: about 8 minutes.
+
+== Talking points
+
+On vanilla Kubernetes an operations team owns all of this by hand:
+
+* A Deployment plus `nvidia.com/gpu`
+* Memory-backed `/dev/shm` (`emptyDir` medium Memory) or vLLM degrades
+* An init container to fetch weights (ORAS or a wget script)
+* Ingress timeouts for long generations
+* Homemade HPA, quota, and a spreadsheet for which team owns which GPU
+
+{rhoai_product} puts the same job in operators and the dashboard:
+
+* Model catalog with validated ModelCar images and minimum vRAM
+* Model Registry so you version an artifact, then deploy that version (not a tag in chat)
+* HardwareProfiles (1 / 2 / 4 GPU) instead of tribal YAML
+* ServingRuntime templates (RHAIIS vLLM, OpenAI API, probes, `/dev/shm`)
+* Kueue LocalQueues so a third deploy *queues* instead of silently pending
+* OpenShift Routes and OpenShift AI **Observe & monitor → Infrastructure** (GPU and Kueue queues)
+
+== Click path
+
+. Open the **OpenShift AI dashboard** from the banner.
+. Note Data Science Projects `{presenter_project}`, `{ran_project}`, `{core_project}`.
+. Open **Settings → Hardware profiles** (or the equivalent 3.5 navigation) and show the 1 / 2 / 4 GPU products.
+
+== Honesty
+
+This lab does **not** pre-create InferenceServices. You will **register** each model in Model Registry **workshop**, then deploy the version from the UI so the operations workflow is visible.

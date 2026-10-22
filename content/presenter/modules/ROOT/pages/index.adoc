@@ -1,0 +1,39 @@
+= How to run the demo
+
+This site is the **presenter guide**. It has talking points, time cuts, and the click path you drive on stage.
+
+Students use a **different URL** — **Playground** in the blue banner. Do not send them this presenter site.
+
+== Time cuts
+
+* *60 min* — C1 to C4 (include the C2 CPU workbench; skip C2b, C3b, C4b). C3/C4 still **register then deploy**.
+* *90 min* — C1 to C8 including C2b, C3b, and C4b (MCP catalog, Playground, ModelCar)
+* *120 min* — CORE plus TELCO
+* Technology Preview FAQ is talk-only except C2b and C3b, which are live clicks
+
+== What you will operate
+
+* {rhoai_product} {rhoai_version} dashboard — deploy and scale models
+* CPU workbench in `{workbench_project}` — Jupyter with Red Hat LangChain + vLLM examples
+* Model Registry **workshop** — every model is registered here *before* you deploy (C3 onward)
+* MCP Catalog / MCP Registry / MCP server for Red Hat OpenShift — **Technology Preview**
+* Custom MCP catalog card **workshop-custom-mcp** — how you onboard *your* server (C2b)
+* **Gen AI studio → Playground** — chat plus OpenShift MCP tools (C3b; Technology Preview). Not the student lab-guide URL.
+* Open WebUI — optional presenter chat (Admin OpenAI connection, in-cluster). Students do **not** use it for inference.
+* OpenShift AI **Observe & monitor → Infrastructure** — GPU and Kueue queue health
+
+You will *not* load GGUF files into Open WebUI. Deploy with **Model access** and **Require token authentication** (`workshop-infer`). Students call the Route with curl or Python. Direct Connections stay disabled (`*.svc.cluster.local` is not reachable from a browser).
+
+== After the show
+
+Hand students the **Playground** URL from the banner. They work in `{ran_project}` or `{core_project}` for two days. You keep this presenter guide.
+
+== Official names
+
+Use **Red Hat OpenShift** and **Red Hat OpenShift AI** in discussion. This lab is serving operations, not RAN CNFs and not model training.
+
+== Docs
+
+* https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/[OpenShift AI 3.5]
+* https://docs.redhat.com/en/documentation/red_hat_ai/3/html/validated_models/model-support-matrix_validated-models[Validated model matrix]
+* https://access.redhat.com/support/offerings/techpreview[Technology Preview support scope]

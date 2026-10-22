@@ -1,0 +1,21 @@
+site:
+  title: Presenter guide
+  start_page: modules::index.adoc
+
+content:
+  sources:
+    - url: ..
+      start_path: content/presenter
+      worktrees: true
+
+ui:
+  bundle:
+    url: ./ui-bundle.zip
+    snapshot: true
+
+runtime:
+  fetch: false
+  cache_dir: ./.cache/antora-presenter
+
+output:
+  dir: ./www/presenter

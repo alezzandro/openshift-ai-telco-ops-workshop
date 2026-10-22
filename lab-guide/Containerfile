@@ -1,0 +1,70 @@
+# Multi-stage: Antora on UBI9 Node.js, static sites on UBI9 httpd.
+# Two audiences: presenter (Route lab-guide) and playground (Route playground).
+FROM registry.access.redhat.com/ubi9/nodejs-20 AS build
+USER 0
+WORKDIR /site
+# git: Antora reads local content from a git worktree.
+# python3: zip the vendored UI bundle (no GitHub fetch at build time).
+RUN dnf install -y git-core python3 \
+    && dnf clean all \
+    && npm install --omit=dev --prefix /opt/antora @antora/cli@3.1.10 @antora/site-generator@3.1.10
+ENV PATH="/opt/antora/node_modules/.bin:${PATH}"
+COPY lab-guide /site/lab-guide
+COPY content /site/content
+RUN git init \
+    && git config user.email "workshop@local" \
+    && git config user.name "workshop" \
+    && git add content lab-guide \
+    && git commit -m "workshop content" \
+    && python3 - <<'PY'
+import os, zipfile
+root = "/site/lab-guide/ui"
+out = "/site/lab-guide/ui-bundle.zip"
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+    for dirpath, _, files in os.walk(root):
+        for name in files:
+            path = os.path.join(dirpath, name)
+            zf.write(path, os.path.relpath(path, root))
+print("wrote", out)
+PY
+WORKDIR /site/lab-guide
+RUN antora --stacktrace presenter-site.yml \
+    && antora --stacktrace playground-site.yml
+
+FROM registry.access.redhat.com/ubi9/httpd-24
+USER 0
+COPY --from=build /site/lab-guide/www/ /opt/app-root/src/
+RUN printf '%s\n' '{"console":"","rhoai_dashboard":"","open_webui":""}' \
+      | tee /opt/app-root/src/presenter/env.json /opt/app-root/src/playground/env.json >/dev/null \
+    && printf '%s\n' \
+         '<IfModule !mod_rewrite.c>' \
+         'LoadModule rewrite_module modules/mod_rewrite.so' \
+         '</IfModule>' \
+         'DocumentRoot "/opt/app-root/src"' \
+         'RewriteEngine On' \
+         'RewriteCond %{HTTP_HOST} ^playground-' \
+         'RewriteRule ^/presenter/ - [F]' \
+         'RewriteCond %{HTTP_HOST} !^playground-' \
+         'RewriteRule ^/playground/ - [F]' \
+         'RewriteCond %{HTTP_HOST} ^playground-' \
+         'RewriteRule ^/$ /playground/index.html [L]' \
+         'RewriteCond %{REQUEST_URI} !^/presenter/' \
+         'RewriteCond %{REQUEST_URI} !^/playground/' \
+         'RewriteCond %{HTTP_HOST} ^playground-' \
+         'RewriteRule ^/(.*)$ /playground/$1 [L]' \
+         'RewriteRule ^/$ /presenter/index.html [L]' \
+         'RewriteCond %{REQUEST_URI} !^/presenter/' \
+         'RewriteCond %{REQUEST_URI} !^/playground/' \
+         'RewriteRule ^/(.*)$ /presenter/$1 [L]' \
+         '<Directory "/opt/app-root/src">' \
+         '    AllowOverride None' \
+         '    Require all granted' \
+         '    Options -Indexes +FollowSymLinks' \
+         '    DirectoryIndex index.html' \
+         '</Directory>' \
+         > /etc/httpd/conf.d/lab-guide.conf \
+    && rm -f /etc/httpd/conf.d/welcome.conf \
+    && chown -R 1001:0 /opt/app-root/src \
+    && chmod -R g+rwX /opt/app-root/src
+USER 1001
+EXPOSE 8080

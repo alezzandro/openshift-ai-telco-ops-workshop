@@ -1,0 +1,41 @@
+# GPU MachineSet nodes are tainted nvidia.com/gpu=True:NoSchedule.
+# Queue-backed HardwareProfiles cannot set spec.scheduling.node (the CRD
+# rejects it), so dashboard InferenceServices do not start with that
+# toleration. Matching spec.tolerations here tells Kueue to skip the
+# "untolerated taint" admission check and inject the toleration onto
+# admitted predictor pods.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: l4-gpu-4
+spec:
+  nodeLabels:
+    node-role.kubernetes.io/worker-gpu: ""
+    workshop.opendatahub.io/l4-count: "4"
+  nodeTaints:
+    - key: nvidia.com/gpu
+      value: "True"
+      effect: NoSchedule
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Equal
+      value: "True"
+      effect: NoSchedule
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: l4-gpu-2
+spec:
+  nodeLabels:
+    node-role.kubernetes.io/worker-gpu: ""
+    workshop.opendatahub.io/l4-count: "2"
+  nodeTaints:
+    - key: nvidia.com/gpu
+      value: "True"
+      effect: NoSchedule
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Equal
+      value: "True"
+      effect: NoSchedule

@@ -1,0 +1,123 @@
+= C3. Register then deploy (Ministral 3 14B)
+
+Time: about 18 minutes.
+
+This is the pattern for **every** later model: discover in the catalog (or name an OCI URI), **register a version in Model Registry**, then **deploy that version**. Do **not** click **Deploy model** on the catalog card in this lab. Catalog deploy is a shortcut; the governed path is register, then deploy from the registry.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_model_catalog/index[Working with the model catalog]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry[Working with model registries]
+
+== Model
+
+* Ministral 3 14B Instruct
+* ModelCar `registry.redhat.io/rhai/modelcar-ministral-3-14b-instruct-2512:3.0`
+* About 18 GB — validated **1 × L4**
+* vLLM tool parser `mistral` (needed for C3b / P9 MCP tool calls)
+* https://docs.redhat.com/en/documentation/red_hat_ai/3/html/validated_models/model-support-matrix_validated-models[Validated model matrix]
+
+Images were pre-pulled during setup. The deploy should not sit on ImagePull for 20 minutes.
+
+== Story
+
+Catalog answers "what can I run?" Registry answers "what did we approve, which version, and where does serving pull from?" Telco ops should not paste OCI tags in chat. They register a version, then every project deploys *that* artifact.
+
+== 1. Register from the catalog
+
+. OpenShift AI → **AI hub → Models → Catalog**.
+. Search **Ministral 3 14B Instruct**. Open the card. Point at min vRAM and the ModelCar URI; do **not** click Deploy.
+. Click **Register model**.
+. Model registry: **workshop**.
+. Model name: leave **Ministral 3 14B Instruct** (or shorten to `ministral-3-14b`).
+. Version name: `3.0` (matches the ModelCar tag).
+. Source model format: `vLLM` (leave the catalog default if it is already filled). Source model format version: `1`.
+. Model location: the catalog URI is pre-filled and read-only. That is the artifact the registry will remember.
+. **Register model**.
+
+Verification: **AI hub → Registry** → registry **workshop** shows the new model and version `3.0`.
+
+== 2. Deploy the registered version
+
+. Still on **AI hub → Registry**, registry **workshop**.
+. Open the Ministral model. On version `3.0`, action menu (⋮) → **Deploy**.
+. Project: `{presenter_project}`. If no matching connection exists, continue — the wizard autofills the catalog URI as a new connection.
+. **Deploy** to open the serving wizard:
+** Model type: Generative AI
+** Serving runtime: vLLM NVIDIA GPU (or auto-select)
+** Hardware profile: *NVIDIA L4 - 1 GPU*
+** Advanced settings:
+*** Check **Add as AI asset endpoint** (use case `chat`) so C3b can open this model in **Gen AI studio → Playground**
+*** Check **Model access** (external route)
+*** Check **Require token authentication**. Service account name: `workshop-infer` (setup created this SA in each Data Science Project)
+** Custom runtime arguments (one flag per field, **no leading space** — a leading space turns `--max-model-len=24576` into `model_tag` and vLLM uses 262144 context, which OOM-kills the L4): `--max-model-len=24576`, `--enable-auto-tool-choice`, `--tool-call-parser=mistral`
++
+`--max-model-len=24576` is required for C3b. Gen AI Playground injects the OpenShift MCP tool schemas (~12k input tokens) and requests 4096 output tokens. `--max-model-len=8192` fails with `[invalid_prompt]` before any tool runs. On 1 × L4, Ministral 14B still has ~28k KV tokens after weights, so 24576 fits (concurrency drops from ~3.5× to ~1.1×). Do **not** raise it toward 262144.
+. Review → **Deploy**. Wait until the InferenceService is **Ready** on **AI hub → Deployments**.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying_models[Deploying models (OpenShift AI 3.5)]
+
+If the predictor pods stay **SchedulingGated**, Kueue has not admitted them. Typical causes: ClusterQueues missing `spec.cohortName: workshop-gpu` (v1beta2 dropped `spec.cohort`, so rehearsal cannot borrow the 4-L4 node), or ResourceFlavors `l4-gpu-4` / `l4-gpu-2` missing `spec.tolerations` for `nvidia.com/gpu` (queue HardwareProfiles cannot attach that taint). Two Pending pods during a stuck rollout is KServe surge — one Ready replica is enough.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry#deploying-a-model-version-from-a-model-registry[Deploy a model version from a model registry]
+
+Talking points:
+
+* Registry stores **metadata and location**, not a second copy of the weights.
+* The same registered version can be deployed into `{ran_project}` and `{core_project}` later (C8 / playground) without re-copying an OCI tag.
+* **Model access** plus **Require token authentication** is the student contract: TLS Route, 401 without a bearer token.
+* This lab uses the operator-generated PostgreSQL for Model Registry. That database is **not** supported for production.
+
+== Test with an external client (the student path)
+
+Open WebUI Direct Connections cannot resolve `*.svc.cluster.local` from a laptop. Students do **not** configure Open WebUI. They call the **authenticated Route** with curl or Python (same OpenAI-compatible API).
+
+. On **AI hub → Deployments**, open the Ministral deployment. Copy the **external** endpoint (`https://ministral-3-14b-instruct-version-{presenter_project}.apps.<cluster>/`). Copy the token, or mint one:
++
+----
+oc create token workshop-infer -n telco-ops-demo --duration=8h
+----
+. Unauthenticated request must fail:
++
+----
+curl -sk -o /dev/stderr -w "%{http_code}\n" https://<route-host>/v1/models
+----
++
+Expect **401**.
+. Authenticated list and chat (model id `ministral-3-14b-instruct-version`; if the dashboard named the service differently, use `oc get route -n telco-ops-demo -l inferenceservice-name` and `/v1/models`):
++
+----
+export MODEL_URL=https://$(oc get route ministral-3-14b-instruct-version -n telco-ops-demo -o jsonpath='{.spec.host}')
+export TOKEN=$(oc create token workshop-infer -n telco-ops-demo --duration=8h)
+
+curl -sk -H "Authorization: Bearer ${TOKEN}" "${MODEL_URL}/v1/models"
+
+curl -sk -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+  "${MODEL_URL}/v1/chat/completions" \
+  -d '{"model":"ministral-3-14b-instruct-version","messages":[{"role":"user","content":"What is tensor parallelism in one sentence?"}],"max_tokens":64}'
+----
++
+Same call in Python (stdlib; `-k` equivalent because the Route uses the cluster CA):
++
+----
+python3 - <<'PY'
+import json, os, ssl, urllib.request
+url, token = os.environ["MODEL_URL"], os.environ["TOKEN"]
+req = urllib.request.Request(
+    f"{url}/v1/chat/completions",
+    data=json.dumps({
+        "model": "ministral-3-14b-instruct-version",
+        "messages": [{"role": "user", "content": "What is tensor parallelism in one sentence?"}],
+        "max_tokens": 64,
+    }).encode(),
+    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    method="POST",
+)
+print(json.load(urllib.request.urlopen(req, context=ssl._create_unverified_context())))
+PY
+----
+
+Optional presenter-only: Open WebUI **Admin Panel → Settings → Connections** can still use the in-cluster URL `http://<predictor>.{presenter_project}.svc.cluster.local:8080/v1` (no token). That path is the Open WebUI pod, not the student laptop. Direct Connections stay disabled.
+
+Talking point: the Route is the public contract (TLS + bearer token). Cluster-internal clients (Gen AI Playground, Open WebUI admin) keep using port **8080** on the predictor Service.
+
+Next: xref:c3b-gen-ai-playground.adoc[C3b. Gen AI Studio Playground and OpenShift MCP] (skip on a 60-minute cut).

@@ -1,0 +1,33 @@
+= Rules of the playground
+
+You have two days on this cluster. Stay inside your Data Science Project.
+
+== You may
+
+* Register versions in Model Registry **workshop** and deploy (or delete) InferenceServices in **your** project
+* Call **your** model's external Route with a `workshop-infer` token (curl or Python). Do not use Open WebUI Direct Connections.
+* Read node labels and dashboard metrics
+* Follow exercises P1–P9
+* Use **Gen AI studio → Playground** with the read-only OpenShift MCP server (Technology Preview)
+
+== You must not
+
+* Edit operators, `ClusterPolicy`, `DataScienceCluster`, or MachineSets
+* Cordon, drain, or taint nodes
+* Deploy a 4-GPU tensor-parallel model while someone else needs GPUs — if you do, delete it immediately
+* Load GGUF weights into Open WebUI
+* Run training / Ray jobs (those operators are Removed)
+* Create a GPU workbench — notebooks belong in `{workbench_project}` (CPU only)
+
+== If a model is Pending for GPUs
+
+Stop. Do **not** create a second one. Check OpenShift AI **Observe & monitor → Infrastructure** (GPU and queues) and whether another tenant still holds cards. Ask the facilitator, or delete unused InferenceServices.
+
+== Accounts
+
+* OpenShift: HTPasswd `studentN` (the facilitator has the password; it is not in this banner). Stay in your assigned Data Science Project.
+* Inference: Route URL + `workshop-infer` token from **your** project (not the presenter admin Open WebUI)
+
+== Reset
+
+The facilitator can run `./setup/reset-demo.sh` to wipe InferenceServices without dropping Model Registry entries.

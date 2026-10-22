@@ -1,0 +1,17 @@
+name: modules
+title: Playground
+version: ~
+nav:
+  - modules/ROOT/nav.adoc
+asciidoc:
+  attributes:
+    page-pagination: true
+    lab_name: "OpenShift AI Telco Operations Workshop"
+    guide_audience: playground
+    ocp_product: "Red Hat OpenShift"
+    rhoai_product: "Red Hat OpenShift AI"
+    rhoai_version: "3.5"
+    presenter_project: telco-ops-demo
+    workbench_project: telco-ops-notebooks
+    ran_project: telco-ran-ai
+    core_project: telco-core-ai

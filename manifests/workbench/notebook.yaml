@@ -1,0 +1,92 @@
+# Placeholders __NOTEBOOK_IMAGE__, __DASHBOARD_URL__, and __IMAGE_DISPLAY_NAME__
+# are substituted by setup/09-deploy-workbench.sh.
+# OpenShift AI 3.5 injects kube-rbac-proxy + HTTPRoute when inject-auth is true.
+# (inject-oauth is the 2.x annotation; the dashboard then shows "Migration required".)
+apiVersion: kubeflow.org/v1
+kind: Notebook
+metadata:
+  name: cpu-langchain
+  namespace: telco-ops-notebooks
+  labels:
+    app: cpu-langchain
+    opendatahub.io/dashboard: "true"
+  annotations:
+    notebooks.opendatahub.io/inject-auth: "true"
+    notebooks.opendatahub.io/oauth-logout-url: "__DASHBOARD_URL__/projects/telco-ops-notebooks?notebookLogout=cpu-langchain"
+    notebooks.opendatahub.io/last-image-selection: "s2i-generic-data-science-notebook:3.5"
+    opendatahub.io/image-display-name: "__IMAGE_DISPLAY_NAME__"
+    opendatahub.io/hardware-profile-name: cpu-only
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    openshift.io/display-name: "CPU LangChain examples"
+    openshift.io/description: "CPU workbench with Red Hat llm-on-openshift Jupyter examples. Does not request a GPU."
+spec:
+  template:
+    spec:
+      enableServiceLinks: false
+      serviceAccountName: cpu-langchain
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+      containers:
+        - name: cpu-langchain
+          image: __NOTEBOOK_IMAGE__
+          imagePullPolicy: IfNotPresent
+          workingDir: /opt/app-root/src
+          env:
+            - name: NOTEBOOK_ARGS
+              value: |
+                --ServerApp.port=8888
+                --ServerApp.token=''
+                --ServerApp.password=''
+                --ServerApp.base_url=/notebook/telco-ops-notebooks/cpu-langchain
+                --ServerApp.quit_button=False
+            - name: JUPYTER_IMAGE
+              value: __NOTEBOOK_IMAGE__
+          ports:
+            - name: notebook-port
+              containerPort: 8888
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "1"
+              memory: 4Gi
+            limits:
+              cpu: "2"
+              memory: 8Gi
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /notebook/telco-ops-notebooks/cpu-langchain/api
+              port: notebook-port
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /notebook/telco-ops-notebooks/cpu-langchain/api
+              port: notebook-port
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          volumeMounts:
+            - name: cpu-langchain
+              mountPath: /opt/app-root/src
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: cpu-langchain
+          persistentVolumeClaim:
+            claimName: cpu-langchain
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi

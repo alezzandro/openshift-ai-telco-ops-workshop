@@ -1,0 +1,37 @@
+apiVersion: infrastructure.opendatahub.io/v1
+kind: HardwareProfile
+metadata:
+  name: gpu-l4-4-tp
+  namespace: redhat-ods-applications
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/dashboard-feature-visibility: '["model-serving"]'
+    opendatahub.io/display-name: "NVIDIA L4 - 4 GPU tensor parallel"
+    opendatahub.io/description: "All four L4 GPUs on one node. Set --tensor-parallel-size=4. Consumes the whole node."
+    opendatahub.io/disabled: "false"
+    opendatahub.io/managed: "false"
+spec:
+  identifiers:
+    - displayName: CPU
+      identifier: cpu
+      resourceType: CPU
+      defaultCount: 16
+      minCount: 8
+      maxCount: 32
+    - displayName: Memory
+      identifier: memory
+      resourceType: Memory
+      defaultCount: 64Gi
+      minCount: 32Gi
+      maxCount: 128Gi
+    - displayName: NVIDIA GPU
+      identifier: nvidia.com/gpu
+      resourceType: Accelerator
+      defaultCount: 4
+      minCount: 4
+      maxCount: 4
+  scheduling:
+    type: Queue
+    kueue:
+      localQueueName: workshop-4gpu

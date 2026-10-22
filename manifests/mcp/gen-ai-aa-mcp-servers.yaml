@@ -1,0 +1,18 @@
+# Cluster-wide MCP list for Gen AI Studio → Playground (Technology Preview).
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/playground-prerequisites_rhoai-user
+# Keys are case-sensitive. Values must be JSON with url + description.
+# https://access.redhat.com/support/offerings/techpreview
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gen-ai-aa-mcp-servers
+  namespace: redhat-ods-applications
+  labels:
+    workshop.opendatahub.io/component: gen-ai-playground
+data:
+  openshift-mcp-server: |
+    {
+      "url": "http://openshift-mcp-server.telco-ops-demo.svc.cluster.local:8080/mcp",
+      "type": "streamable-http",
+      "description": "Technology Preview. Read-only MCP server for Red Hat OpenShift (core and config toolsets, ClusterRole view plus node list) deployed in telco-ops-demo. Use from Gen AI Studio Playground. Do not ask it to create, patch, or delete resources."
+    }

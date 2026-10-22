@@ -1,0 +1,21 @@
+.Welcome
+* xref:index.adoc[How to run the demo]
+* xref:lab-map.adoc[Lab map]
+
+.Guided demo
+* xref:c1-why-not-raw-vllm.adoc[C1. Why not raw vLLM]
+* xref:c2-platform-tour.adoc[C2. Platform tour]
+* xref:c2b-onboard-mcp.adoc[C2b. Onboard your own MCP server]
+* xref:c3-catalog-deploy.adoc[C3. Register then deploy]
+* xref:c3b-gen-ai-playground.adoc[C3b. Gen AI Studio Playground]
+* xref:c4-custom-model.adoc[C4. Hugging Face to S3]
+* xref:c4b-modelcar.adoc[C4b. Custom ModelCar]
+* xref:c5-inference-types.adoc[C5. Inference service types]
+* xref:c6-tensor-parallel.adoc[C6. Single-node tensor parallel]
+* xref:c7-scale.adoc[C7. Horizontal vs vertical scale]
+* xref:c8-tenancy.adoc[C8. GPU tenancy]
+* xref:t1-t3-telco.adoc[TELCO. Ops framing]
+
+.Reference
+* xref:overnight.adoc[Overnight and morning]
+* xref:tech-preview-faq.adoc[Technology Preview FAQ]

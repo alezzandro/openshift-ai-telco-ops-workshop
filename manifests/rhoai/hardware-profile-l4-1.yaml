@@ -1,0 +1,40 @@
+# Queue-backed profile: LocalQueue name "workshop" exists in every DS project.
+# GPU node placement comes from Kueue ResourceFlavor l4-gpu-2 / l4-gpu-4
+# (not nodeSelector here). During rehearsal, workshop borrows the 4-L4 node.
+apiVersion: infrastructure.opendatahub.io/v1
+kind: HardwareProfile
+metadata:
+  name: gpu-l4-1
+  namespace: redhat-ods-applications
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/dashboard-feature-visibility: '["model-serving","workbench"]'
+    opendatahub.io/display-name: "NVIDIA L4 - 1 GPU"
+    opendatahub.io/description: "Single NVIDIA L4 (24 GB) for catalog and quantized models"
+    opendatahub.io/disabled: "false"
+    opendatahub.io/managed: "false"
+spec:
+  identifiers:
+    - displayName: CPU
+      identifier: cpu
+      resourceType: CPU
+      defaultCount: 4
+      minCount: 2
+      maxCount: 8
+    - displayName: Memory
+      identifier: memory
+      resourceType: Memory
+      defaultCount: 16Gi
+      minCount: 8Gi
+      maxCount: 32Gi
+    - displayName: NVIDIA GPU
+      identifier: nvidia.com/gpu
+      resourceType: Accelerator
+      defaultCount: 1
+      minCount: 1
+      maxCount: 1
+  scheduling:
+    type: Queue
+    kueue:
+      localQueueName: workshop

@@ -1,0 +1,44 @@
+# Fallback if Queue-backed HardwareProfiles are rejected by this cluster's CRD.
+# Applied only by 06-configure-rhoai.sh when Queue apply fails.
+apiVersion: infrastructure.opendatahub.io/v1
+kind: HardwareProfile
+metadata:
+  name: gpu-l4-1
+  namespace: redhat-ods-applications
+  labels:
+    opendatahub.io/dashboard: "true"
+  annotations:
+    opendatahub.io/dashboard-feature-visibility: '["model-serving","workbench"]'
+    opendatahub.io/display-name: "NVIDIA L4 - 1 GPU"
+    opendatahub.io/description: "Single NVIDIA L4 (24 GB) — Node placement fallback"
+    opendatahub.io/disabled: "false"
+    opendatahub.io/managed: "false"
+spec:
+  identifiers:
+    - displayName: CPU
+      identifier: cpu
+      resourceType: CPU
+      defaultCount: 4
+      minCount: 2
+      maxCount: 8
+    - displayName: Memory
+      identifier: memory
+      resourceType: Memory
+      defaultCount: 16Gi
+      minCount: 8Gi
+      maxCount: 32Gi
+    - displayName: NVIDIA GPU
+      identifier: nvidia.com/gpu
+      resourceType: Accelerator
+      defaultCount: 1
+      minCount: 1
+      maxCount: 1
+  scheduling:
+    type: Node
+    node:
+      nodeSelector:
+        node-role.kubernetes.io/worker-gpu: ""
+      tolerations:
+        - effect: NoSchedule
+          key: nvidia.com/gpu
+          operator: Exists

@@ -1,0 +1,79 @@
+= C4b. Package a Hugging Face model as a ModelCar
+
+Time: about 8 minutes. Skip on a 60-minute cut. The image was **pre-built** during setup so you do not wait on Hugging Face.
+
+C4 served weights **from S3**. Edge sites, disconnected clusters, and GitOps pipelines often want the same snapshot as an **OCI image** (a ModelCar): pull it like any other container, then KServe copies `/models` into the predictor.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying-models_rhoai-user[Storing a model in an OCI image]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/working-with-model-registries_model-registry[Working with model registries]
+
+== Story
+
+A ModelCar is a UBI9 image whose only job is to hold model files under `/models`. The serving runtime stays vLLM. You do **not** bake vLLM into this image.
+
+Dashboard **Register and store** can also turn an S3 or `hf://` origin into a ModelCar Job. This chapter shows the Containerfile you would keep in Git, which is the air-gap-friendly path.
+
+== Model
+
+* `ibm-granite/granite-3.3-2b-instruct` (Apache 2.0) — small enough for **1 × L4** with KV headroom
+* ImageStream `{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop`
+* URI: `oci://image-registry.openshift-image-registry.svc:5000/{presenter_project}/modelcar-granite-3-3-2b-instruct:workshop`
+
+== 1. Containerfile (what setup built)
+
+The workshop file is `manifests/modelcar/Containerfile`:
+
+----
+FROM registry.access.redhat.com/ubi9/python-311:1 AS fetch
+USER 0
+RUN pip install --no-cache-dir "huggingface_hub>=0.24,<3"
+ARG HF_REPO_ID=ibm-granite/granite-3.3-2b-instruct
+ENV HF_HUB_ENABLE_HF_TRANSFER=0 HF_REPO_ID=${HF_REPO_ID}
+RUN python3 -c "from huggingface_hub import snapshot_download; import os; snapshot_download(repo_id=os.environ['HF_REPO_ID'], local_dir='/opt/app-root/src/models')"
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6
+COPY --from=fetch --chown=0:0 /opt/app-root/src/models /models
+RUN chmod -R a=rX /models
+USER 65534
+----
+
+Rules from product docs: the final image **must have a shell** (not `scratch`); files are world-readable for the random OpenShift UID.
+
+To rebuild (do **not** on stage unless the ImageStream is missing):
+
+----
+oc start-build modelcar-granite-3-3-2b-instruct -n telco-ops-demo --follow
+----
+
+Setup already ran that build. Confirm:
+
+----
+oc get istag modelcar-granite-3-3-2b-instruct:workshop -n telco-ops-demo
+----
+
+== 2. Register the OCI URI
+
+. **AI hub → Registry** → **Register model**.
+. **Register** (metadata only). Location: **URI**:
++
+`oci://image-registry.openshift-image-registry.svc:5000/telco-ops-demo/modelcar-granite-3-3-2b-instruct:workshop`
+. Name: `granite-3-3-2b-instruct`. Version: `workshop`. Format: `vLLM` / `1`.
+. **Register model**.
+
+== 3. Deploy
+
+. Version `workshop` → ⋮ → **Deploy**. Hardware profile *NVIDIA L4 - 1 GPU*.
+. **Model access** + **Require token authentication** (`workshop-infer`).
+. `--max-model-len=8192` (no leading space).
+. Wait **Ready**. Curl the Route like C3.
+
+If C3 and C4 are still up this is a **third** GPU. Fine on 4-L4; delete one if you are heading into C6.
+
+Talking points:
+
+* S3 (C4) is the **data-center** path. ModelCar (C4b) is the **image** path — same registry, same GitOps, works when object storage is not in the edge site.
+* Both still go through Model Registry before deploy.
+* In production the OCI destination is Quay or a disconnected mirror, not only the in-cluster registry.
+
+Next: xref:c5-inference-types.adoc[C5. Inference service types].

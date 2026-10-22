@@ -1,0 +1,83 @@
+= C2b. Onboard your own MCP server
+
+Time: about 8 minutes. Skip on a 60-minute cut.
+
+MCP Catalog, MCP Lifecycle Operator, and MCP server for Red Hat OpenShift are **Technology Preview**. Not supported with Red Hat production SLAs; not recommended for production.
+
+https://access.redhat.com/support/offerings/techpreview[Technology Preview Features Support Scope]
+
+== Story
+
+C2 showed a **Red Hat** catalog card (`openshift-mcp-server`) already deployed. Customers also ask: *how do we publish **our** MCP — a ticketing tool, an inventory API, a RAN telemetry service — so data scientists deploy it from the same catalog?*
+
+You do not paste a public URL into the dashboard and hope. You treat the server like any other OpenShift workload:
+
+. Package it as a container that speaks MCP over HTTP (path `/mcp` is the catalog default).
+. Push the image to a registry the cluster can pull (`registry.redhat.io`, Quay, or your disconnected mirror).
+. Describe it in a **catalog YAML** (name, image, port, tools, ServiceAccount).
+. Users click **Deploy** in **AI hub → MCP servers → Catalog**. The MCP Lifecycle Operator creates the `MCPServer` custom resource, Deployment, and Service.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_mcp_catalog/index[Working with the MCP catalog]
+
+== What this lab seeded
+
+Setup wrote a custom source into ConfigMap `mcp-catalog-sources` in `rhoai-model-registries` (the empty `mcp_catalogs: []` list is where **your** catalogs go; Red Hat / partner / community catalogs stay in the platform `default-catalog-sources`).
+
+The example card is **workshop-custom-mcp**. The **image is a stand-in**: the certified MCP server for Red Hat OpenShift, so this workshop never pulls an uncertified community image. In a customer environment you change `artifacts.uri` to *your* UBI9 image.
+
+== Click path (catalog)
+
+. OpenShift AI → **AI hub → MCP servers → Catalog**.
+. In the **search** box type `workshop-custom-mcp` (or `workshop`). Press Enter.
+. The left chips are only **Red Hat** / **Red Hat Partners** / community. There is no Workshop chip. Search is the way you find a custom source.
+. Open **workshop-custom-mcp**. Point at:
+** `artifacts.uri` — where the image lives
+** `runtimeMetadata.defaultPort` / `mcpPath` — how the operator probes the server
+** `serviceAccount.suggestedName: mcp-viewer` — this lab already bound that account to ClusterRole `view` plus node list (C3b)
+. Optional live deploy: **Deploy MCP server** into `{presenter_project}`. Set `runtime.security.serviceAccountName: mcp-viewer` if the YAML field is empty. Confirm **Available** on **Deployments**.
+. If time is short, **do not deploy**. Showing the card is the onboarding lesson. You already have `openshift-mcp-server` running.
+
+If search returns nothing, the catalog service is up but not the *leader* (a rolling restart can leave a stale Postgres lock). Facilitator: `./setup/health-check.sh --fix`, then search again.
+
+== Two other onboarding paths
+
+=== GitOps ConfigMap (what setup used)
+
+Same pattern as custom **model** catalog sources, but the key list is `mcp_catalogs` on ConfigMap `mcp-catalog-sources`:
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/manage_and_govern_model_catalog_sources/configuring-model-catalog-sources-in-openshift_manage-govern-model-catalog-sources[Configure catalog sources in OpenShift]
+
+The workshop file is `manifests/mcp/workshop-mcp-catalog.yaml`. Setup wraps it into ConfigMap `mcp-catalog-sources`.
+
+. `sources.yaml` points at a sibling key (`yamlCatalogPath: workshop-mcp-catalog.yaml`).
+. That sibling is the catalog document (`source:` + `mcp_servers:`).
+. After you change the ConfigMap, wait a minute (or bounce `deployment/model-catalog` in `rhoai-model-registries`) and refresh the Catalog page.
+
+=== `MCPServer` custom resource (no catalog)
+
+Platform teams who already know the image can skip the catalog and apply the CR the operator already watches. This repo's example is `manifests/mcp/mcpserver.yaml`. Users then see the instance on **Deployments**, not as a Catalog card.
+
+=== Dashboard Settings (Developer Preview)
+
+OpenShift AI 3.5 also has an administrator **Settings** UI to add MCP catalog YAML without editing the ConfigMap. That administrative interface is **Developer Preview**. Prefer GitOps / the ConfigMap for this workshop.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/release_notes/developer-preview-features_relnotes[Developer Preview features]
+
+== What you must get right on a real customer MCP
+
+* **UBI9** (or another Red Hat base) for the runtime image. Pin a tag or digest; do not ship `:latest`.
+* Listen on a port the `MCPServer` spec will use (this catalog uses **8080** and path **/mcp**).
+* Least-privilege ServiceAccount. Read-only namespaced inspect → ClusterRole `view`. Listing Nodes (C3b) needs an extra ClusterRole — `view` does not include them. A write-capable MCP needs a tighter, purpose-built Role — never cluster-admin.
+* Secrets (API tokens, DB passwords) as Kubernetes Secrets referenced from `runtimeMetadata`, not in the catalog YAML in git.
+* Support-tier honesty in `customProperties.supportTier`. A home-grown server is not *Red Hat supported*.
+* MCP Gateway is **not** required to deploy from the catalog. Add it later if you need a single governed front door.
+
+Talking points:
+
+* Catalog onboarding is how you scale from "one team’s Deployment YAML" to "self-service Deploy for every Data Science Project."
+* The operator, not the dashboard, is the source of truth (`MCPServer` in `mcp.x-k8s.io`).
+* This lab does **not** install MCP Gateway and does **not** wire the server into Gen AI Studio.
+
+Required phrase: "Not supported with Red Hat production SLAs; not recommended for production."
+
+Next: xref:c3-catalog-deploy.adoc[C3. Register then deploy] — first **model**: catalog → Model Registry → serving. Same idea as this chapter, different catalog.

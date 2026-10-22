@@ -1,0 +1,57 @@
+# Catalog metadata: ServiceAccount needs ClusterRole view for read-only
+# namespaced access. Built-in view does *not* include core nodes (only
+# metrics.k8s.io/nodes). C3b lists worker-gpu nodes and allocatable
+# nvidia.com/gpu, so add a narrow node-reader ClusterRole. Playground does
+# not pass a user bearer token; the MCP server uses this SA.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mcp-viewer
+  namespace: telco-ops-demo
+  labels:
+    app: openshift-mcp-server
+    workshop.opendatahub.io/component: mcp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workshop-openshift-mcp-viewer
+  labels:
+    app: openshift-mcp-server
+    workshop.opendatahub.io/component: mcp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: mcp-viewer
+    namespace: telco-ops-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: workshop-mcp-node-reader
+  labels:
+    app: openshift-mcp-server
+    workshop.opendatahub.io/component: mcp
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/status"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: workshop-openshift-mcp-node-reader
+  labels:
+    app: openshift-mcp-server
+    workshop.opendatahub.io/component: mcp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: workshop-mcp-node-reader
+subjects:
+  - kind: ServiceAccount
+    name: mcp-viewer
+    namespace: telco-ops-demo

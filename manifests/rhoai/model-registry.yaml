@@ -1,0 +1,19 @@
+# Workshop Model Registry. PostgreSQL is operator-generated (evaluation only).
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_model_registries/creating-a-model-registry_managing-model-registries
+apiVersion: modelregistry.opendatahub.io/v1beta1
+kind: ModelRegistry
+metadata:
+  name: workshop
+  namespace: rhoai-model-registries
+  annotations:
+    openshift.io/display-name: Workshop
+    openshift.io/description: "Workshop model registry. Uses operator-generated PostgreSQL (not for production)."
+spec:
+  postgres:
+    generateDeployment: true
+    image: registry.redhat.io/rhel9/postgresql-16@sha256:510ac645787b2ba27f6ab8bb8488656d025d8c2ddcbf8cc5b15447dac941687b
+  rest:
+    port: 8080
+    serviceRoute: disabled
+  kubeRBACProxy:
+    serviceRoute: enabled

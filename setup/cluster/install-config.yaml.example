@@ -1,0 +1,45 @@
+# Example only. setup/01-install-cluster.sh writes the real file (with pull
+# secret and SSH key) to ./cluster/install-config.yaml, which is gitignored.
+apiVersion: v1
+baseDomain: vfq4m.gcp.redhatworkshops.io
+credentialsMode: Passthrough
+metadata:
+  name: ocp
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  platform:
+    gcp:
+      type: n2-standard-8
+      osDisk:
+        diskSizeGB: 120
+        diskType: pd-ssd
+  replicas: 2
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  platform:
+    gcp:
+      type: n2-standard-4
+      osDisk:
+        diskSizeGB: 120
+        diskType: pd-ssd
+  replicas: 3
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - 172.30.0.0/16
+platform:
+  gcp:
+    projectID: openenv-vfq4m
+    region: asia-southeast1
+publish: External
+pullSecret: '{"auths":{}}'
+sshKey: 'ssh-ed25519 AAAA... workshop-ipi'

@@ -1,0 +1,25 @@
+= TELCO. Ops framing
+
+Time: about 25 minutes. No CNFs, no SR-IOV configuration, no PTP, no real-time kernel.
+
+== T1. Who shares the GPU pool
+
+You already operate a horizontal CaaS for network functions. This workshop is the same job for **inference**: GPU nodes, model lifecycle, quotas, and SLO-grade observability.
+
+Analogy only (do not configure SR-IOV on this G2 machine type):
+
+* `SriovNetworkNodePolicy` + VF count → NFD + GPU Operator + `nvidia.com/gpu`
+* Namespace quota so one CNF does not consume the VF pool → HardwareProfiles + Kueue + ResourceQuota
+* Over-subscribe VFs and the data plane dies → over-subscribe VRAM and the serving pod never becomes Ready
+
+== T2. Day-2 serving
+
+* OpenShift AI → **Observe & monitor → Infrastructure**: GPU utilization, memory, and Kueue queues
+* Model lifecycle: register a version in Model Registry, deploy that version, delete leftover InferenceServices (`./setup/reset-demo.sh`). Registry entries can stay.
+* Overnight: `./setup/overnight-stop.sh --reset`. Morning: `./setup/overnight-start.sh` (not `--fix` alone — that does not start stopped VMs)
+
+== T3. Fit the model to the site
+
+Prefer quantized or 8B–24B-class models on L4-class cards. 70B FP16 (~162 GB min vRAM) does not fit 96 GB. That is a *different SKU* (more GPUs per node, often NVLink), not a missing YAML flag.
+
+If asked about a model larger than one node: right-size, quantize, then single-node tensor parallel. Multi-node / disaggregated inference is Technology Preview — see xref:tech-preview-faq.adoc[the FAQ].

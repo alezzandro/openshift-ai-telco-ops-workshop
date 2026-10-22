@@ -1,0 +1,59 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MANIFESTS_DIR="${SCRIPT_DIR}/../manifests/operators"
+# shellcheck source=ensure-authenticated.sh
+source "${SCRIPT_DIR}/ensure-authenticated.sh"
+# shellcheck source=defaults.sh
+source "${SCRIPT_DIR}/defaults.sh"
+# shellcheck source=lib.sh
+source "${SCRIPT_DIR}/lib.sh"
+
+echo "=== Installing operators ==="
+echo ""
+
+echo "1. Node Feature Discovery..."
+oc apply -f "${MANIFESTS_DIR}/nfd-subscription.yaml"
+echo ""
+
+echo "2. NVIDIA GPU Operator (certified catalog)..."
+oc apply -f "${MANIFESTS_DIR}/gpu-operator-subscription.yaml"
+echo ""
+
+echo "3. Red Hat OpenShift AI (stable-3.x)..."
+oc apply -f "${MANIFESTS_DIR}/rhoai-subscription.yaml"
+echo ""
+
+echo "4. cert-manager Operator for Red Hat OpenShift (Kueue prerequisite)..."
+if oc get csv -n cert-manager-operator --no-headers 2>/dev/null \
+    | grep 'cert-manager-operator' | awk '{print $NF}' | grep -qx Succeeded; then
+  echo "  [OK] cert-manager Operator already Succeeded"
+else
+  apply_operator_manifest "${MANIFESTS_DIR}/cert-manager-subscription.yaml"
+fi
+echo ""
+
+echo "5. Red Hat build of Kueue..."
+KUEUE_CHANNEL="$(packagemanifest_default_channel kueue-operator)"
+if [ -z "${KUEUE_CHANNEL}" ]; then
+  KUEUE_CHANNEL="stable-v1.4"
+fi
+echo "  Channel: ${KUEUE_CHANNEL}"
+TMP_KUEUE="$(mktemp)"
+sed "s|channel: stable-v1.4|channel: ${KUEUE_CHANNEL}|" \
+  "${MANIFESTS_DIR}/kueue-subscription.yaml" > "${TMP_KUEUE}"
+oc apply -f "${TMP_KUEUE}"
+rm -f "${TMP_KUEUE}"
+echo ""
+
+echo "Waiting for CSVs..."
+wait_for_csv "openshift-nfd" "nfd" 300 || true
+wait_for_csv "nvidia-gpu-operator" "gpu-operator" 300 || true
+wait_for_csv "redhat-ods-operator" "rhods-operator" 420 || true
+wait_for_csv "cert-manager-operator" "cert-manager" 300 || true
+wait_for_csv "openshift-kueue-operator" "kueue-operator" 300 || true
+
+echo ""
+echo "=== Operator installation initiated ==="
+echo "Run 'oc get csv -A' if a CSV is still installing."

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: s4
+  labels:
+    app: s4
+    kubernetes.io/metadata.name: s4
+    workshop.opendatahub.io/component: s4

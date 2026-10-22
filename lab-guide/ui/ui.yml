@@ -1,0 +1,5 @@
+spec:
+  name: workshop-ui
+  version: 1.0.0
+output_dir: .
+static_files: []

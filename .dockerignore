@@ -1,0 +1,10 @@
+.git
+.cursor
+agent-tools
+private
+setup/.generated-credentials.env
+**/.generated-credentials.env
+**/*.env
+lab-guide/www
+lab-guide/.cache
+**/__pycache__

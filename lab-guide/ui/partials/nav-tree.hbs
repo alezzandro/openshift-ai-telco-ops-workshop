@@ -1,0 +1,14 @@
+{{#if content}}
+  {{#if url}}
+    <a href="{{relativize url}}"{{#if (eq url @root.page.url)}} class="is-current"{{/if}}>{{{content}}}</a>
+  {{else}}
+    <div class="nav-heading">{{{content}}}</div>
+  {{/if}}
+{{/if}}
+{{#if items}}
+<ul>
+  {{#each items}}
+    <li>{{> nav-tree}}</li>
+  {{/each}}
+</ul>
+{{/if}}

@@ -1,0 +1,21 @@
+# Two audiences, two Antora playbooks, two OpenShift Routes:
+#   presenter-site.yml  → Route lab-guide
+#   playground-site.yml → Route playground
+# Kept so older docs that name default-site.yml still point here.
+site:
+  title: OpenShift AI Telco Operations Workshop
+  start_page: modules::index.adoc
+content:
+  sources:
+    - url: ..
+      start_path: content/presenter
+      worktrees: true
+ui:
+  bundle:
+    url: ./ui-bundle.zip
+    snapshot: true
+runtime:
+  fetch: false
+  cache_dir: ./.cache/antora
+output:
+  dir: ./www/presenter

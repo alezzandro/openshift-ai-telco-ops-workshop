@@ -1,0 +1,50 @@
+# Pre-build the C4b ModelCar into the internal registry so class does not wait
+# on a Hugging Face download. Source Dockerfile matches Containerfile.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: modelcar-granite-3-3-2b-instruct
+  namespace: telco-ops-demo
+  labels:
+    workshop.opendatahub.io/component: modelcar
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: modelcar-granite-3-3-2b-instruct
+  namespace: telco-ops-demo
+  labels:
+    workshop.opendatahub.io/component: modelcar
+spec:
+  runPolicy: Serial
+  completionDeadlineSeconds: 5400
+  output:
+    to:
+      kind: ImageStreamTag
+      name: modelcar-granite-3-3-2b-instruct:workshop
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+  source:
+    type: Dockerfile
+    dockerfile: |
+      FROM registry.access.redhat.com/ubi9/python-311:1 AS fetch
+      USER 0
+      RUN pip install --no-cache-dir "huggingface_hub>=0.24,<3"
+      ARG HF_REPO_ID=ibm-granite/granite-3.3-2b-instruct
+      ENV HF_HUB_ENABLE_HF_TRANSFER=0 HF_REPO_ID=ibm-granite/granite-3.3-2b-instruct
+      RUN python3 -c "from huggingface_hub import snapshot_download; import os; snapshot_download(repo_id=os.environ['HF_REPO_ID'], local_dir='/opt/app-root/src/models')"
+      FROM registry.access.redhat.com/ubi9/ubi-minimal:9.6
+      COPY --from=fetch --chown=0:0 /opt/app-root/src/models /models
+      RUN chmod -R a=rX /models
+      USER 65534
+  strategy:
+    type: Docker
+  triggers: []

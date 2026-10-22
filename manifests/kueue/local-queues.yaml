@@ -1,0 +1,31 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: workshop
+  namespace: telco-ops-demo
+spec:
+  clusterQueue: gpu-pool-2l4
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: workshop-4gpu
+  namespace: telco-ops-demo
+spec:
+  clusterQueue: gpu-pool-4l4
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: workshop
+  namespace: telco-ran-ai
+spec:
+  clusterQueue: gpu-pool-2l4
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  name: workshop
+  namespace: telco-core-ai
+spec:
+  clusterQueue: gpu-pool-2l4

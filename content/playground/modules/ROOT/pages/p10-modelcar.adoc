@@ -1,0 +1,15 @@
+= P10. Custom ModelCar from Hugging Face
+
+Setup pre-built `ibm-granite/granite-3.3-2b-instruct` as a ModelCar in the in-cluster registry so you do not download Hugging Face during class.
+
+URI:
+
+----
+oci://image-registry.openshift-image-registry.svc:5000/telco-ops-demo/modelcar-granite-3-3-2b-instruct:workshop
+----
+
+. **AI hub → Registry** → **Register model** (metadata, URI above), format `vLLM`, version `workshop`.
+. Deploy into *your* project with *1 GPU*, **Model access**, `workshop-infer` token auth, `--max-model-len=8192`.
+. Curl the Route. Delete the InferenceService when finished so P3 still has L4s.
+
+The Containerfile is UBI9 + `/models` (see the presenter C4b page). Do not `oc start-build` unless the facilitator says the ImageStream is missing.

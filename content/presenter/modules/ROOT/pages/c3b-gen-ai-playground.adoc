@@ -1,0 +1,69 @@
+= C3b. Gen AI Studio Playground and OpenShift MCP
+
+Time: about 10 minutes. Skip on a 60-minute cut.
+
+{rhoai_product} {rhoai_version} **Gen AI studio → Playground** is Technology Preview. MCP Catalog, MCP Lifecycle Operator, and MCP server for Red Hat OpenShift are also Technology Preview. Not supported with Red Hat production SLAs; not recommended for production.
+
+https://access.redhat.com/support/offerings/techpreview[Technology Preview Features Support Scope]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/experimenting_with_models_in_the_gen_ai_playground/index[Experimenting with models in the gen AI playground]
+
+This is **not** the student lab-guide Playground URL.
+
+== Story
+
+C3 put Ministral on a GPU with an OpenAI-compatible Route. That is still the student contract (curl + bearer token). Playground is the **in-dashboard** path: chat plus Model Context Protocol tools against the same model, without leaving OpenShift AI.
+
+The OpenShift MCP server in `{presenter_project}` is **read-only** (`core` + `config` toolsets, ClusterRole `view`). Ask it to inspect. Do not ask it to create, patch, or delete.
+
+== 1. Open Playground on the C3 model
+
+. OpenShift AI → **Gen AI studio → Playground**.
+. Select the Ministral deployment from C3 (it is listed because you checked **Add as AI asset endpoint**).
+. Confirm the playground instance is Ready. Setup does **not** pre-create this; the first open from the dashboard creates an `OGXServer` (`ogx.io`) in `{presenter_project}`.
+
+Required phrases: "Gen AI playground is Technology Preview." "OGX operator, not LlamaStack."
+
+== 2. Enable OpenShift MCP tools
+
+. In the playground **MCP** / tools list, enable **openshift-mcp-server** (the in-cluster URL from ConfigMap `gen-ai-aa-mcp-servers`).
+. Leave write tools off — this lab set `read_only = true` on the server.
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_applications/mcp-server[MCP server for Red Hat OpenShift]
+
+== 3. Inspect GPU nodes (do not guess)
+
+Paste:
+
+----
+Using OpenShift MCP tools, list nodes with the worker-gpu role. For each, say how many nvidia.com/gpu are allocatable. Do not guess — use the tools. Do not create, patch, or delete anything.
+----
+
+Rehearsal expectation: **one** node with `node-role.kubernetes.io/worker-gpu`, **4** allocatable `nvidia.com/gpu` (the `g2-standard-48`). After C3, **1** of those 4 is in use. Class day (`scale-students.sh`) adds three 2-L4 nodes.
+
+If the model answers "I don't have permission":
+
+* **No tool call** (or `[invalid_prompt]` / 8192 context) — the request never reached MCP. See below.
+* **Tool call then 403** — Playground does not forward your user token. The server uses ServiceAccount `mcp-viewer`. ClusterRole `view` can list pods but **not** core Nodes; setup must also bind `workshop-mcp-node-reader`. Facilitator: `oc apply -f manifests/mcp/rbac.yaml`.
+
+== `[invalid_prompt]` / 8192 context
+
+Playground injects **every** OpenShift MCP tool schema into the prompt (~12k input tokens) and the OGX vLLM provider defaults to **4096** output tokens. vLLM rejects the call when `input + max_tokens` exceeds `--max-model-len`:
+
+----
+[invalid_prompt] This model's maximum context length is 8192 tokens.
+However, you requested 4096 output tokens and your prompt contains 12297
+input tokens, for a total of 16393 tokens.
+----
+
+Fix: on the Ministral InferenceService, set `--max-model-len=24576` (C3 wizard). On 1 × L4, Ministral 14B still has ~28k KV tokens after the 14.72 GiB weights, so 24576 fits. `--max-model-len=8192` is enough for short curl chats and too small for MCP.
+
+A leading space on that argument (` --max-model-len=...`) is a different failure: vLLM treats it as `model_tag` and opens **262144** context, which OOM-kills the L4.
+
+Talking points:
+
+* Tool-enabled playground is a **context budget** problem, not a GPU-count problem.
+* Capping `--max-model-len` is still an ops control — 24576 is the MCP-shaped cap on this L4, not "as large as the model card."
+* Students still call the authenticated Route. Playground is the presenter / playground-tenant demo of MCP.
+
+Next: xref:c4-custom-model.adoc[C4. Hugging Face to S3].

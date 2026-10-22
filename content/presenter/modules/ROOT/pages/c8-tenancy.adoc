@@ -1,0 +1,47 @@
+= C8. GPU tenancy
+
+Time: about 12 minutes.
+
+== Pattern
+
+One GPU pool, two application teams. Same idea as a shared device pool with quota — not time-slicing, not MIG (L4 has none).
+
+[cols="1,1"]
+|===
+| Platform object | Role
+
+| Data Science Project
+| Namespace + dashboard RBAC
+
+| ResourceQuota (2 GPU)
+| Hard cap on `{ran_project}` and `{core_project}`
+
+| Kueue LocalQueue `workshop`
+| Admission / fair share against ClusterQueue `gpu-pool-2l4` (borrows 4-L4 during rehearsal)
+
+| Kueue LocalQueue `workshop-4gpu`
+| 4-GPU stretch only (`telco-ops-demo` → `gpu-pool-4l4`)
+
+| NetworkPolicy
+| Playground and ingress may reach predictors; students stay in their project
+
+| Token auth (`workshop-infer`)
+| External Route requires a bearer token with `get` on InferenceServices in *that* project
+|===
+
+== Click path
+
+. In OpenShift AI, switch to `{ran_project}` (or impersonate a bound user).
+. **AI hub → Registry** → **workshop** → the Ministral version from C3 → ⋮ → **Deploy** into `{ran_project}` on *NVIDIA L4 - 1 GPU*. Same registered artifact, different project — that is the tenancy story. Do not deploy from the catalog card.
+. Advanced settings: **Model access**, **Require token authentication**, service account `workshop-infer`.
+. From a laptop, curl the **ran** Route with a `workshop-infer` token minted in `{ran_project}`. Then curl the **presenter** Route with that same token — expect **401**. Isolation is the Data Science Project plus token auth, not Open WebUI.
+. Try a third 1-GPU deploy while four GPUs are busy — it should **queue** or hit quota, not silently steal the presenter's cards.
+
+Talking points:
+
+* Tenancy is the Data Science Project, ResourceQuota, Kueue, NetworkPolicy, and per-project tokens.
+* Do not send students to Open WebUI Direct Connections (`*.svc.cluster.local` is not reachable from a browser). They use the Route + token, or **Gen AI studio → Playground** in their project.
+
+== Student RBAC
+
+This lab logs in with HTPasswd `admin` / `student1`–`student9`, all bound as `cluster-admin` so students can use `oc` without extra RoleBindings. Tenant **ResourceQuota 2 GPU** on `{ran_project}` and `{core_project}` still caps serving. In production, students would be namespace admin only and must not patch `ClusterPolicy`, `DataScienceCluster`, MachineSets, or Nodes.

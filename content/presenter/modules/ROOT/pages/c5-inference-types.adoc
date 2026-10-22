@@ -1,0 +1,31 @@
+= C5. Inference service types
+
+Time: about 10 minutes.
+
+The live object you created is a KServe `InferenceService` in single-model (RawDeployment) mode.
+
+[cols="1,1,2"]
+|===
+| Type | CR | This lab
+
+| Single-model (KServe)
+| `InferenceService`
+| **CORE live path** — one LLM, dedicated vLLM, HPA/replicas
+
+| Multi-model (ModelMesh)
+| `InferenceService` + ModelMesh
+| Slide only. Designed for many *small* predictive models sharing a server. Wrong default for vLLM. L4 still cannot MIG-slice.
+
+| Distributed inference (llm-d)
+| `LLMInferenceService`
+| DEEP / FAQ. Single-node is the only honest topology on this G2 L4 lab. Multi-node and disaggregated prefill/decode are Technology Preview and need RDMA this machine type does not have.
+|===
+
+== Docs
+
+* https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploying_models/deploying_models[Deploying models]
+* https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploy_models_using_distributed_inference_with_llm-d/index[Distributed Inference with llm-d]
+
+== Do not
+
+Do not open the llm-d topology selector in CORE except to say: single-node serving is the GA-class path you just used; multi-node P/D is Technology Preview and not this lab.

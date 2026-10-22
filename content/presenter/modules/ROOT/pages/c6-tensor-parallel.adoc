@@ -1,0 +1,48 @@
+= C6. Single-node tensor parallel (GA)
+
+Time: about 15 minutes.
+
+== Product message
+
+If a model does not fit one GPU:
+
+. Prefer a smaller or quantized variant that *does* fit one GPU (or one node).
+. If you still need more VRAM, use **tensor parallelism on GPUs of the same node** (`--tensor-parallel-size=N`). That is the **GA** path.
+. Splitting one replica across nodes (pipeline parallel / disaggregated P/D) is **Technology Preview**, needs a GPU fabric, and is **not** demonstrated here.
+
+https://docs.redhat.com/en/documentation/red_hat_ai_inference/3.5/html/vllm_server_arguments/key-server-arguments-server-arguments[vLLM key server arguments]
+
+== Model
+
+* Mistral Small 3.1 24B Instruct FP8-dynamic
+* Min vRAM about 29.7 GB — validated **2 × L4**
+* `--tensor-parallel-size=2`
+
+== Honesty (PCIe)
+
+NVIDIA L4 on G2 (`g2-standard-48` / `g2-standard-24`) has **no NVLink**. Tensor parallel still works (NCCL over PCIe). It is slower than NVLink-class cards. The *OpenShift AI workflow* (GPU count in the wizard + serving arg) is the same as on dense GPU nodes. On rehearsal the 2-GPU job shares the 4-L4 node; on class day it uses a whole 2-L4 node.
+
+== Click path (register, then deploy)
+
+. Stop or delete the previous large InferenceService so two GPUs are free. Leave the Ministral / Qwen **registry entries**; you are only freeing GPUs.
+. **Register** the 24B FP8 as a version in Model Registry **workshop** (same path as C3/C4):
+** Prefer **AI hub → Models → Catalog** → search *Mistral Small 3.1 24B* → **Register model** into **workshop**, version `1.5-fp8`.
+** If the card is missing: **AI hub → Registry** → **Register model**, URI
++
+`oci://registry.redhat.io/rhelai1/modelcar-mistral-small-3-1-24b-instruct-2503-fp8-dynamic:1.5`
++
+Format `vLLM`. Do **not** use *Register and store*.
+. Open the registered version → ⋮ → **Deploy** into `{presenter_project}`.
+. Hardware profile: *NVIDIA L4 - 2 GPU tensor parallel*.
+. Additional serving arguments: `--tensor-parallel-size=2` and `--max-model-len=8192`.
+. GPU count in the form must match the tensor parallel size.
+. Advanced settings: **Model access**, **Require token authentication** (`workshop-infer`).
+. Wait Ready. In OpenShift AI **Observe & monitor → Infrastructure**, two GPUs show memory.
+
+== Test with curl
+
+On deploy, keep **Model access** and **Require token authentication** (`workshop-infer`). Re-point `MODEL_URL` at the new Route and send the same chat payload as C3.
+
+== Do not deploy
+
+Do not select multi-node or prefill/decode topologies. Single-node is always available; other patterns are greyed out unless an administrator created templates — and this cluster has no RDMA.

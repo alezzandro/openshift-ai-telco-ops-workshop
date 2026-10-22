@@ -1,0 +1,39 @@
+apiVersion: datasciencecluster.opendatahub.io/v2
+kind: DataScienceCluster
+metadata:
+  name: default-dsc
+spec:
+  components:
+    dashboard:
+      managementState: Managed
+    kserve:
+      managementState: Managed
+    workbenches:
+      managementState: Managed
+      workbenchNamespace: rhods-notebooks
+    modelregistry:
+      managementState: Managed
+      registriesNamespace: rhoai-model-registries
+    # Technology Preview: MCP Catalog deploy button needs this operator.
+    mcplifecycleoperator:
+      managementState: Managed
+    # Tenancy is the Red Hat build of Kueue operator, not the embedded one.
+    kueue:
+      managementState: Unmanaged
+    ray:
+      managementState: Removed
+    trainingoperator:
+      managementState: Removed
+    aipipelines:
+      managementState: Removed
+    trustyai:
+      managementState: Removed
+    feastoperator:
+      managementState: Removed
+    llamastackoperator:
+      managementState: Removed
+    # Required for Gen AI Studio → Playground (Technology Preview).
+    ogx:
+      managementState: Managed
+    aigateway:
+      managementState: Removed
