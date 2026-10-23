@@ -1,0 +1,148 @@
+Gemini Nano Banana — infrastructure architecture prompt
+======================================================
+
+How to use
+----------
+1. Open Google AI Studio or the Gemini app.
+2. Choose an image model: Gemini 2.5 Flash Image (Nano Banana) or, if
+   available, Gemini 3 Pro Image (Nano Banana Pro) for cleaner text.
+3. Set aspect ratio to 16:9 landscape.
+4. Paste everything below the dashed line as the prompt.
+5. If labels are misspelled, regenerate with: "Keep the same layout and
+   colors. Fix every spelling error. Do not add or remove boxes."
+
+
+----------------------------------------------------------------------
+Create a professional enterprise infrastructure architecture diagram for a
+workshop titled:
+
+"Infrastructure architecture — Red Hat OpenShift on Google Cloud"
+
+Purpose: a slide-ready diagram for telco platform engineers. It must show
+the live Google Cloud IPI cluster that hosts Red Hat OpenShift 4.22 and
+NVIDIA L4 GPU workers. This is infrastructure only. Do not draw OpenShift
+AI dashboard screens, InferenceServices, or application pods.
+
+Visual style
+- Clean 2D infographic, not a photograph, not isometric 3D clutter, not a
+  datacenter render.
+- White background, thin gray hairlines, generous whitespace.
+- Red Hat-inspired palette: accent red #EE0000, near-black #151515, cool
+  gray #6A6E73, light fill #F5F5F5, NVIDIA green only on GPU boxes.
+- Rounded rectangles with a 2 px border. One short title per box, 1–2
+  subtitle lines in a smaller sans-serif.
+- Straight orthogonal arrows with small arrowheads. No spaghetti lines.
+- All text English, title case or official product spelling, Helvetica /
+  Inter / Noto Sans. Every label must be spelled correctly.
+- Do not invent product logos, hats, penguins, clouds-with-faces, or
+  watermarks. Use labeled boxes instead of fake logos.
+- No people, no laptops, no city skylines.
+
+Overall layout (left to right, four columns)
+
+COLUMN 1 — Google Cloud foundation (left, light gray panel)
+Title at top of column: "Google Cloud  ·  asia-southeast1"
+Boxes stacked top to bottom:
+  1. "Existing Cloud DNS zone" subtitle "<guid>.gcp.redhatworkshops.io
+     (do not create or re-delegate)"
+  2. "Let's Encrypt TLS" subtitle "lego --dns gcloud  ·  API + wildcard
+     apps certificates"
+  3. "External HTTPS" subtitle "OpenShift console  ·  apps Routes"
+  4. "Regional GPU quota" subtitle "NVIDIA_L4_GPUS  ·  rehearsal ≥ 4  ·
+     class ≥ 10"
+A small footnote under the column: "RHPDS Open Environment  ·  no autostop"
+
+COLUMN 2 — OpenShift cluster boundary (center-left, large rounded frame)
+Outer frame title: "Red Hat OpenShift 4.22  ·  installer-provisioned (IPI)"
+Inside the frame, three horizontal node-pool bands stacked:
+
+  Band A (top, white): "Control plane"
+    Three identical small boxes in a row: "master-0", "master-1", "master-2"
+    Shared subtitle under the row: "3 × n2-standard-4  ·  no GPU"
+
+  Band B (middle, pale gray): "General workers (untainted)"
+    Two boxes: "worker-0" and "worker-1"
+    Shared subtitle: "2 × n2-standard-8"
+    A compact tag list under the band (small pills, not extra columns):
+    "OpenShift AI operators"  "KServe controller"  "NFD / GPU Operator
+    controllers"  "S4 demo object storage"  "Lab guide (UBI9 httpd)"
+    "Open WebUI (presenter only)"
+    Caption under the pills: "Platform and demo services stay on CPU
+    workers so GPU nodes only run inference."
+
+  Band C (bottom, pale red tint): "GPU workers  ·  tainted"
+    Two machine-set groups side by side:
+
+    Left group, red border: "MachineSet  4-L4"
+      One large GPU node box: "g2-standard-48"
+      Four small green squares inside it labeled "L4" "L4" "L4" "L4"
+      Subtitle: "replicas 1  ·  rehearsal node  ·  96 GB VRAM"
+
+    Right group, green-gray border: "MachineSet  2-L4"
+      Three smaller GPU node boxes in a row, each with two green "L4"
+      squares: "g2-standard-24" × 3
+      Subtitle: "replicas 0 until scale-students.sh  ·  class day +6 L4"
+
+    Shared labels under Band C as a single line of pills:
+      "node-role.kubernetes.io/worker-gpu"
+      "workshop.opendatahub.io/l4-count = 4 | 2"
+      "taint  nvidia.com/gpu=True:NoSchedule"
+
+COLUMN 3 — GPU enablement stack (center-right, vertical)
+Title: "GPU enablement on the node"
+Four boxes top to bottom, connected by downward arrows:
+  1. "Node Feature Discovery" subtitle "nvidia.com/gpu.present=true"
+  2. "NVIDIA GPU Operator" subtitle "ClusterPolicy  ·  certified catalog"
+  3. "Allocatable devices" subtitle "nvidia.com/gpu = 4  or  2"
+  4. "DCGM Exporter :9400" subtitle "ServiceMonitor  ·  cluster Prometheus"
+
+A callout box under those four, light yellow:
+  "NVIDIA L4 on G2"
+  "No MIG — isolation is a whole GPU"
+  "No NVLink — tensor parallelism is NCCL over PCIe"
+  "No RDMA — multi-node / disaggregated serving is out of scope"
+  "Do not add a second 4-L4 node"
+
+COLUMN 4 — Day-2 capacity (right, narrow)
+Title: "Capacity modes"
+Two stacked cards:
+
+  Card "Rehearsal"
+  "setup/full-setup.sh"
+  "1 × g2-standard-48"
+  "4 × NVIDIA L4"
+
+  Card "Class day"
+  "setup/scale-students.sh"
+  "1 × 4-L4  +  3 × 2-L4"
+  "10 × NVIDIA L4  ·  240 GB"
+
+Bottom card, thinner:
+  "Overnight"
+  "scale GPU MachineSets to 0"
+  "pause Machine API"
+  "gcloud compute instances stop"
+  "GPU VMs are deleted when replicas = 0; masters and CPU workers keep disks"
+
+Arrows (keep to these six; do not add more)
+- Cloud DNS / TLS → OpenShift cluster frame ("public names and certificates")
+- External HTTPS → cluster frame
+- Band C GPU workers → GPU enablement column ("labels, taint, devices")
+- DCGM Exporter → a small badge on the cluster frame "Observe metrics path"
+- Rehearsal card → 4-L4 MachineSet
+- Class day card → 2-L4 MachineSet
+
+Footer strip (full width, one line)
+"OpenShift AI Telco Operations Workshop  ·  infrastructure only  ·  software
+platform is a separate diagram  ·  not a RAN / 5G CNF lab"
+
+Negative constraints
+- Do not show Kubernetes pod hexagons covering the whole page.
+- Do not show AWS, Azure, IBM Cloud, bare metal, or OpenStack.
+- Do not show Ansible, ACM, OpenShift Virtualization, Service Mesh, or
+  training clusters.
+- Do not show MIG slices, NVLink bridges, or multi-node GPU fabrics.
+- Do not print secrets, kubeconfigs, project IDs, or real DNS hostnames.
+- Do not crop titles. Keep every box readable at slide distance.
+- Maximum about 18 labeled boxes. Prefer grouping over extra boxes.
+----------------------------------------------------------------------

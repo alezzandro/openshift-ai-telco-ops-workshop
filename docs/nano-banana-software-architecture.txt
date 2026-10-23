@@ -1,0 +1,179 @@
+Gemini Nano Banana — software architecture prompt
+=================================================
+
+How to use
+----------
+1. Open Google AI Studio or the Gemini app.
+2. Choose an image model: Gemini 2.5 Flash Image (Nano Banana) or, if
+   available, Gemini 3 Pro Image (Nano Banana Pro) for cleaner text.
+3. Set aspect ratio to 16:9 landscape.
+4. Paste everything below the dashed line as the prompt.
+5. If labels are misspelled, regenerate with: "Keep the same layout and
+   colors. Fix every spelling error. Do not add or remove boxes."
+
+
+----------------------------------------------------------------------
+Create a professional enterprise software architecture diagram for a
+workshop titled:
+
+"Software architecture — Red Hat OpenShift AI 3.5 on Red Hat OpenShift"
+
+Purpose: a slide-ready diagram for telco platform engineers. It shows how
+inference is operated from the OpenShift AI dashboard on top of an already
+installed OpenShift cluster. This is the software / platform layer. Do not
+redraw Google Cloud machine types, VPC, or DNS.
+
+Visual style
+- Clean 2D layered infographic, white background, thin gray hairlines.
+- Red Hat-inspired palette: accent red #EE0000, near-black #151515, cool
+  gray #6A6E73, light fill #F5F5F5.
+- Color-code the four Data Science Projects so tenancy is obvious:
+    telco-ops-demo        pale red
+    telco-ops-notebooks   pale gray
+    telco-ran-ai          pale blue
+    telco-core-ai         pale teal
+- Rounded rectangles, 2 px borders, short official product names.
+- Orthogonal arrows only. Legend in the bottom-left: solid arrow =
+  "user / API path", dashed arrow = "schedule / admit", dotted arrow =
+  "metrics".
+- All text English, spelled correctly, Helvetica / Inter / Noto Sans.
+- Do not invent product logos or the Red Hat hat. Labeled boxes only.
+- No photographs, no people, no 3D glossy icons, no watermarks.
+
+Overall layout (five horizontal layers, top to bottom)
+
+LAYER 1 — Clients (thin top band)
+Title: "Who uses the platform"
+Three boxes in a row:
+  A. "Presenter"  subtitle "OpenShift AI dashboard  ·  presenter lab guide"
+  B. "Students"   subtitle "playground lab guide  ·  curl / Python from a laptop"
+  C. "Cluster-internal UIs"  subtitle "Gen AI studio Playground  ·  optional
+     Open WebUI (presenter only, Direct Connections off)"
+
+LAYER 2 — Ingress and control plane UIs
+Title: "Access on OpenShift"
+Four boxes:
+  1. "Authenticated OpenShift Route" subtitle "Model access + require token
+     authentication  ·  Bearer workshop-infer  ·  401 without token"
+  2. "Cluster-internal Service :8080" subtitle "Playground and in-cluster
+     clients skip the Route"
+  3. "OpenShift AI dashboard" subtitle "AI hub Catalog  ·  Registry  ·
+     Deploy model  ·  MCP servers  ·  Gen AI studio"
+  4. "In-cluster lab guides" subtitle "two Antora sites in one UBI9 httpd
+     image  ·  lab-guide vs playground-* hostname"
+
+Caption under this layer: "Students never point a browser at *.svc.cluster.local."
+
+LAYER 3 — Data Science Projects and tenancy (the visual center)
+Outer frame title: "Tenancy on OpenShift AI  ·  isolation is quota, queues, and NetworkPolicy (users are cluster-admin for oc login)"
+
+Four project cards in a 2×2 grid:
+
+  Card 1 (pale red): "telco-ops-demo"
+    "Presenter Data Science Project"
+    "Kueue LocalQueue workshop + workshop-4gpu"
+    "Shared GPU pools"
+    "MCP server for Red Hat OpenShift (Technology Preview)"
+    "KServe InferenceServices created from the dashboard (not by setup)"
+
+  Card 2 (pale gray): "telco-ops-notebooks"
+    "CPU Jupyter workbench"
+    "No Kueue LocalQueue"
+    "HardwareProfile: CPU only"
+    "LangChain + vLLM notebooks on PVC"
+
+  Card 3 (pale blue): "telco-ran-ai"
+    "Playground tenant A"
+    "OpenShift ResourceQuota gpu-quota = 2 GPU"
+    "Hard cap is the OpenShift ResourceQuota, not an OpenShift AI Settings form"
+
+  Card 4 (pale teal): "telco-core-ai"
+    "Playground tenant B"
+    "OpenShift ResourceQuota gpu-quota = 2 GPU"
+    "Same pattern as tenant A"
+
+A slim strip under the four cards, three small boxes in a row labeled
+"Where GPU limits live":
+  - "HardwareProfiles"  "gpu-l4-1  ·  gpu-l4-2-tp  ·  gpu-l4-4-tp  ·  cpu-only
+     (size one deploy)"
+  - "Kueue ClusterQueues"  "gpu-pool-4l4  ·  gpu-pool-2l4  ·  cohort borrow
+     on rehearsal  ·  pool admission"
+  - "OpenShift ResourceQuota"  "2 GPU on ran / core  ·  cluster objects,
+     not a dashboard toggle"
+
+LAYER 4 — Serving, models, and tools
+Title: "How a model becomes an endpoint"
+
+Left group "Governance and artifacts":
+  - "Model Catalog (AI hub)"
+  - "Model Registry workshop" subtitle "rhoai-model-registries  ·  operator
+     PostgreSQL (evaluation only, not production DB)"
+  - "Register then Deploy" subtitle "presenters do not use the catalog
+     Deploy shortcut"
+  Three source pills pointing into Registry:
+    "Catalog model"
+    "Hugging Face snapshot via S4 demo S3 (not enterprise object storage)"
+    "ModelCar OCI  ·  in-cluster registry  ·  dockerconfigjson pull secret"
+
+Center group "Serving":
+  - "KServe Standard InferenceService"
+  - "vLLM on NVIDIA GPU" subtitle "Red Hat AI Inference Server runtime"
+  - "Single-node tensor parallelism" subtitle "--tensor-parallel-size=2 or 4
+     on one node  ·  GA for this lab"
+  Small muted badge: "Multi-node llm-d / disaggregated serving is Technology
+  Preview and is NOT this lab"
+  Small muted badge: "Models-as-a-Service and MCP Gateway are NOT installed"
+
+Right group "Gen AI and MCP (Technology Preview)":
+  - "OGX  ·  Gen AI studio Playground" subtitle "Create playground in C3b / P9"
+  - "MCP Catalog + MCP Registry + MCP Lifecycle Operator"
+  - "MCP server for Red Hat OpenShift" subtitle "read-only core + config  ·
+     ServiceAccount mcp-viewer  ·  extra node list for GPU inventory"
+  - Playground Type pills: "Inference" "Embedding" "Transcription"
+    caption "this lab uses Inference only"
+
+LAYER 5 — Platform operators and observability (bottom band)
+Title: "Operators and telemetry on the cluster"
+A row of compact boxes:
+  "Red Hat OpenShift AI operator  ·  DataScienceCluster + DSCI"
+  "NVIDIA GPU Operator + NFD"
+  "Kueue"
+  "Cluster Observability Operator + OpenTelemetry"
+  "DCGM :9400 → Prometheus"
+  "Observe  ·  GPU cards + kserve_vllm recording rules"
+  "NetworkPolicy allow-from-openshift-monitoring"
+
+Footer: "OpenShift AI Observe reads cluster Thanos / user-workload Prometheus;
+vLLM metrics need the leaf-prometheus PrometheusRule."
+
+Arrows (only these; label them)
+Solid (user / API):
+  Presenter → OpenShift AI dashboard
+  Students → Authenticated OpenShift Route
+  Dashboard → Model Registry → KServe InferenceService
+  Playground → cluster-internal :8080 (not the student laptop Route)
+Dashed (schedule / admit):
+  HardwareProfiles → LocalQueues → ClusterQueues → GPU nodes (off-canvas
+  label "GPU workers, see infrastructure diagram")
+  ResourceQuota → telco-ran-ai and telco-core-ai
+Dotted (metrics):
+  vLLM :8080 → user-workload Prometheus → Observe Models
+  DCGM :9400 → cluster Prometheus → Observe GPU
+
+Footer strip (full width, one line)
+"OpenShift AI Telco Operations Workshop  ·  operate inference, do not train
+·  S4 and Open WebUI are documented demo exceptions  ·  not AAP / Lightspeed
+/ GitOps / ServiceNow"
+
+Negative constraints
+- Do not draw Google Cloud VMs, MachineSets, or region maps (other diagram).
+- Do not add Ansible Automation Platform, OpenShift Lightspeed, OpenShift
+  GitOps, ServiceNow, ACM, or TrustyAI (TrustyAI stays Removed).
+- Do not show ModelMesh as the path this lab uses; if mentioned at all, a
+  tiny gray note "not used for LLMs here".
+- Do not show LlamaStackDistribution; this lab uses OGX on OpenShift AI 3.5.
+- Do not show community base images or Docker Hub as the platform.
+- Do not print tokens, passwords, or real hostnames.
+- Maximum about 22 labeled boxes. Prefer grouping. Every word must be
+  readable on a projector.
+----------------------------------------------------------------------
