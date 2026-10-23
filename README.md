@@ -1,8 +1,9 @@
 # OpenShift AI Telco Operations Workshop
 
 A hands-on workshop that teaches **telco platform engineers** how to operate
-inference on **Red Hat OpenShift AI 3.5** instead of hand-rolled vLLM on
-Kubernetes.
+inference on **Red Hat OpenShift AI 3.5.2** instead of hand-rolled vLLM on
+Kubernetes. OLM Subscriptions are pinned (`startingCSV` + Manual approval) so
+operators do not auto-update mid-class; see [docs/architecture.md](docs/architecture.md).
 
 The presenter drives the **OpenShift AI dashboard**, tests models from a
 laptop against an authenticated OpenShift Route, then leaves the cluster as
@@ -25,6 +26,8 @@ guides.
 - Custom ModelCar from an arbitrary Hugging Face model (C4b / P10; pre-built into the in-cluster registry)
 - Call deployed models from a laptop (authenticated OpenShift Route + `workshop-infer` token)
 - Why multi-node / disaggregated serving is Technology Preview and is **not** this lab
+
+Parked ideas (not in this class): [docs/roadmap.md](docs/roadmap.md).
 
 This is **not** a RAN/5G CNF lab, **not** a training/fine-tune class, and **not**
 the self-healing / Ansible closed-loop demo.
@@ -124,7 +127,8 @@ Do not send students the presenter URL. Console login is `admin` / `studentN`
 (passwords are **not** in the lab-guide banner).
 
 Content is authored as Antora AsciiDoc in `content/` and served from a UBI9
-httpd Deployment on the cluster.
+httpd Deployment on the cluster. After any `content/` or `lab-guide/` edit,
+rebuild with `./setup/11-deploy-lab-guide.sh` so the live Routes pick it up.
 
 Open WebUI is a **documented demo exception**: there is no UBI equivalent, so
 the lab pins `ghcr.io/open-webui/open-webui:v0.6.36` (never `:main`) and grants
@@ -164,7 +168,7 @@ setup/       Numbered install scripts (00–12) and Day-2 operations
 manifests/   Operators, RHOAI, Kueue, MCP, S4, ModelCar, projects, Open WebUI, lab guide
 content/     Antora: content/presenter (facilitator) and content/playground (students)
 lab-guide/   Containerfile (UBI9 Node.js build → UBI9 httpd)
-docs/        Architecture, prerequisites, overnight runbook
+docs/        Architecture, prerequisites, overnight runbook, roadmap
 ```
 
 ## Confidentiality

@@ -18,7 +18,10 @@ metadata:
   namespace: openshift-kueue-operator
 spec:
   channel: stable-v1.4
-  installPlanApproval: Automatic
   name: kueue-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
+  # Pin: Red Hat build of Kueue 1.4.3 on the class cluster (2026-10-23).
+  # Do not rewrite this channel from PackageManifest at install time.
+  startingCSV: kueue-operator.v1.4.3
+  installPlanApproval: Manual

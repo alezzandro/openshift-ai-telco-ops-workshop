@@ -1,10 +1,14 @@
+# Presenter 1/2-GPU deploys use the 4-L4 node (gpu-pool-4l4) so class-day
+# students have the 6 GPU 2-L4 pool to themselves. Students still share
+# LocalQueue name "workshop"; HardwareProfiles look the queue up in the
+# target namespace.
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue
 metadata:
   name: workshop
   namespace: telco-ops-demo
 spec:
-  clusterQueue: gpu-pool-2l4
+  clusterQueue: gpu-pool-4l4
 ---
 apiVersion: kueue.x-k8s.io/v1beta2
 kind: LocalQueue

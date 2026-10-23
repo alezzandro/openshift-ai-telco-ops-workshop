@@ -18,11 +18,11 @@ Work only in the Data Science Project you were assigned:
 
 | `{ran_project}`
 | Playground tenant A
-| ResourceQuota 2 GPU
+| ResourceQuota 5 GPU
 
 | `{core_project}`
 | Playground tenant B
-| ResourceQuota 2 GPU
+| ResourceQuota 5 GPU
 
 | `{workbench_project}`
 | CPU Jupyter workbench (shared, no GPU)
@@ -30,6 +30,8 @@ Work only in the Data Science Project you were assigned:
 |===
 
 Do not deploy into `{presenter_project}` — that is the facilitator project.
+
+Both tenant projects are Kueue-managed (`LocalQueue` `workshop` → ClusterQueue `gpu-pool-2l4`). On class day that pool is **6 GPU**. The **5 GPU** number in the table is OpenShift `ResourceQuota` `gpu-quota` on *your* namespace (5+5 oversubscribes 6 so you can see Kueue queue, not only Forbidden; 5 also absorbs a KServe `maxSurge` extra pod). HTPasswd students are `cluster-admin` on this teaching cluster so you can see those objects; that is not real multi-tenant isolation (xref:p1-p8-exercises.adoc#p6-isolation[P6]).
 
 == Hardware
 
@@ -47,4 +49,4 @@ HardwareProfiles:
 
 == GPU courtesy
 
-Never overlap two large services. Delete or stop your previous InferenceService before the next size class. Registry entries can stay. P10 Granite is 1 GPU; delete a 1-GPU deployment in your project first if you are at quota. The 2 GPU cap is OpenShift `ResourceQuota` `gpu-quota` on your project (not an OpenShift AI Settings quota). Hardware profiles only size *one* deploy.
+Never overlap two large services. Delete or stop your previous InferenceService before the next size class. Registry entries can stay. P10 Granite is 1 GPU; delete a 1-GPU deployment in your project first if you are at quota. The **5 GPU** cap is OpenShift `ResourceQuota` `gpu-quota` on your project (not an OpenShift AI Settings quota). The **6 GPU** student pool is Kueue. Hardware profiles only size *one* deploy.

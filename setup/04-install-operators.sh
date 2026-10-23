@@ -42,17 +42,8 @@ echo "6. Red Hat build of OpenTelemetry (DSCI metrics collector)..."
 apply_operator_manifest "${MANIFESTS_DIR}/opentelemetry-subscription.yaml"
 echo ""
 
-echo "7. Red Hat build of Kueue..."
-KUEUE_CHANNEL="$(packagemanifest_default_channel kueue-operator)"
-if [ -z "${KUEUE_CHANNEL}" ]; then
-  KUEUE_CHANNEL="stable-v1.4"
-fi
-echo "  Channel: ${KUEUE_CHANNEL}"
-TMP_KUEUE="$(mktemp)"
-sed "s|channel: stable-v1.4|channel: ${KUEUE_CHANNEL}|" \
-  "${MANIFESTS_DIR}/kueue-subscription.yaml" > "${TMP_KUEUE}"
-oc apply -f "${TMP_KUEUE}"
-rm -f "${TMP_KUEUE}"
+echo "7. Red Hat build of Kueue (channel + CSV pinned in kueue-subscription.yaml)..."
+oc apply -f "${MANIFESTS_DIR}/kueue-subscription.yaml"
 echo ""
 
 echo "Waiting for CSVs..."

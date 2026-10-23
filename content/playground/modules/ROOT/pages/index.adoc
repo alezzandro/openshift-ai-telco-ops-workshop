@@ -16,9 +16,11 @@ The blue banner at the top is filled from this cluster. Use those links; do not 
 * {rhoai_product} {rhoai_version} dashboard
 * Model Registry **workshop**
 * Your model's authenticated OpenShift Route (curl / Python)
-* OpenShift AI **Observe & monitor → Infrastructure**
+* OpenShift AI **Observe & monitor → Infrastructure** (GPUs and Kueue queues) and **Dashboard → Models** (Deployed models)
 
 You will *not* load GGUF files into Open WebUI. You will *not* edit operators or MachineSets.
+
+Your HTPasswd user is **cluster-admin** so you can inspect Kueue queues, nodes, and Observe. That is a classroom shortcut, not production tenancy. Kueue already admits every GPU deploy you make from the dashboard (Hardware profile → LocalQueue `workshop` → ClusterQueue `gpu-pool-2l4`, **6 GPU** on class day). Your project cap is OpenShift `ResourceQuota` **5 GPU** — high enough to oversubscribe the pool so P5 can show a queue, not only Forbidden. xref:p1-p8-exercises.adoc#p5-kueue[P5] and xref:p1-p8-exercises.adoc#p6-isolation[P6] say what is demo-only and how real isolation is built.
 
 == Official names
 

@@ -8,9 +8,30 @@ In the OpenShift console, **Compute → Nodes**. Filter or look for `worker-gpu`
 
 Each GPU node should advertise `nvidia.com/gpu` allocatable **4**.
 
-Then in **OpenShift AI**, open **Observe & monitor → Infrastructure**. That page is the cluster accelerator view: GPU count, utilization, memory, hardware inventory, and Kueue queues (pool usage, workloads, borrowing).
+Then in **OpenShift AI**, open **Observe & monitor → Infrastructure**. That page is the cluster accelerator view: GPU count, utilization, memory, hardware inventory, and Kueue queues (pool usage, workloads).
+
+Talking points for the Kueue cards:
+
+* **Cluster queue consumption** reads `ClusterQueue` objects from the API. The first load can flash `Error loading cluster queue data` / `storage is (re)initializing` (HTTP 429 while the kube-apiserver watch cache for `kueue.x-k8s.io` warms up). Wait a few seconds; it is **not** the DSCI metrics PVC. DSCI `MonitoringStackAvailable=True` is the Prometheus path.
+* **Accelerator** on that widget is `nvidia.com/gpu` (integer counts). **Compute** and **memory** are Kueue flavor CPU and memory (`cpu` / `memory` on the ClusterQueue, not node utilization). Hardware profiles *do* request 4 CPU and 16Gi per replica; the dashboard often paints those bars at 0% because it does not parse Kubernetes Quantity suffixes (`24660m`, `98778Mi`) the same way it parses GPU integers. That is a UI quirk, not "Kueue is GPU-only."
+* Fleet **Average compute** on the same page is cluster-wide node CPU over ~140 allocatable cores. Seven vLLM pods move that ratio a few percent, which can look like 0%. GPU cards use DCGM `accelerator_gpu_utilization` (idle models also read 0% until you send traffic).
 
 https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-observability_managing-rhoai[Manage observability]
+
+== Models dashboard (Deployed models)
+
+**Observe & monitor → Dashboard → Models** (cluster-admin also sees **LLM Traffic / LLM Performance / LLM Utilization**). That is a different page from **Infrastructure**.
+
+The **Deployed models** table and the **Model deployment** dropdown read `kserve_vllm:*` recording rules from the DSCI Thanos querier. Raw `vllm:*` is scraped; without the recording rules the table stays **No data** and you cannot pick a model. Setup puts `PrometheusRule` `kserve-vllm-recording-rules` in `redhat-ods-monitoring` (`monitoring.rhobs`).
+
+Talking points:
+
+* Filter **Project** to `{ran_project}` or `{core_project}`, then the **Model deployment** list. Both playground Ministrals should appear once at least one replica is Ready.
+* Request / latency / TTFT charts stay near zero until someone curls the Route (P1). **No data** on the whole table is a scrape/recording-rule problem; **0** after a listed model is idle.
+* CPU / namespace-quota columns often stay empty: those PromQL joins `node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate` from cluster Prometheus, which DSCI Thanos does not store.
+* **LLM Traffic / Performance / Utilization** reuse `kserve_vllm:*` (TTFT, KV cache, prefix cache) and add llm-d metrics (`llm_d_epp_*`, `inference_model_request_error_total`). This lab deploys KServe `InferenceService`, not `LLMInferenceService`, so EPP/error panels can stay empty. That is expected.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-observability_managing-rhoai#view-model-performance-metrics_managing-rhoai[View model performance metrics (OpenShift AI 3.5)]
 
 == Open WebUI as admin
 

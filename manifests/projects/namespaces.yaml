@@ -22,7 +22,7 @@ metadata:
     workshop.opendatahub.io/tenant: "ran"
   annotations:
     openshift.io/display-name: "Telco RAN AI (playground)"
-    openshift.io/description: "Playground tenant A — 2 GPU ResourceQuota"
+    openshift.io/description: "Playground tenant A — 5 GPU ResourceQuota (Kueue pool is 6 shared)"
 ---
 apiVersion: v1
 kind: Namespace
@@ -35,7 +35,7 @@ metadata:
     workshop.opendatahub.io/tenant: "core"
   annotations:
     openshift.io/display-name: "Telco Core AI (playground)"
-    openshift.io/description: "Playground tenant B — 2 GPU ResourceQuota"
+    openshift.io/description: "Playground tenant B — 5 GPU ResourceQuota (Kueue pool is 6 shared)"
 ---
 # No kueue.openshift.io/managed label: the dashboard then shows Node-type
 # HardwareProfiles (CPU only). Kueue serving projects hide those profiles.

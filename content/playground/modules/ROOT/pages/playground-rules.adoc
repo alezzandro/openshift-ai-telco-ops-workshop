@@ -25,7 +25,7 @@ Stop. Do **not** create a second one. Check OpenShift AI **Observe & monitor →
 
 == Accounts
 
-* OpenShift: HTPasswd `studentN` (the facilitator has the password; it is not in this banner). Stay in your assigned Data Science Project.
+* OpenShift: HTPasswd `studentN` (the facilitator has the password; it is not in this banner). On this teaching cluster that user is **cluster-admin** so you can inspect queues, nodes, and Observe. That is **not** production tenancy — see xref:p1-p8-exercises.adoc#p6-isolation[P6]. Stay in your assigned Data Science Project. Do not patch ResourceQuota, ClusterQueues, operators, or the other team's project.
 * Inference: Route URL + `workshop-infer` token from **your** project (not the presenter admin Open WebUI)
 
 == Reset

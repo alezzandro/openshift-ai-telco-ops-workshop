@@ -1,5 +1,10 @@
 # Two ClusterQueues so a 4-GPU claim cannot land on a 2-L4 node.
-# Same cohort: during rehearsal, LocalQueue workshop borrows unused 4-L4 quota.
+# Git default is rehearsal: both queues share cohort workshop-gpu so student
+# LocalQueue workshop borrows unused 4-L4 quota (2-L4 flavor quota is 0 here).
+# setup/lib.sh sync_kueue_gpu_quotas *removes* the cohort on class day
+# (2-L4 replicas > 0). Leaving the cohort lets gpu-pool-2l4 borrow presenter
+# 4-L4 GPUs after 6 student cards fill; P5 then hits ResourceQuota, not Kueue.
+# Presenter workshop LocalQueue points at gpu-pool-4l4.
 # Kueue v1beta2 renamed spec.cohort → spec.cohortName; a v1beta2 object with
 # spec.cohort is silently dropped and C3 stays SchedulingGated (quota 0).
 apiVersion: kueue.x-k8s.io/v1beta2

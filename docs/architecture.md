@@ -3,8 +3,26 @@
 The workshop runs on **Google Cloud IPI** Red Hat OpenShift 4.22.18.
 `setup/01-install-cluster.sh` creates that cluster on a blank GCP sandbox in
 **asia-southeast1** (3 × `n2-standard-4` control plane, 2 × `n2-standard-8`
-compute). Setup then clones two GPU MachineSets, installs OpenShift AI 3.5,
+compute). Setup then clones two GPU MachineSets, installs OpenShift AI 3.5.2,
 and deploys Open WebUI plus an in-cluster lab guide.
+
+OLM Subscriptions in `manifests/operators/` pin `startingCSV` and
+`installPlanApproval: Manual` so a catalog z-stream cannot auto-approve
+during class. Do not approve pending InstallPlans unless you intend to
+change these versions.
+
+| Operator | Channel | CSV |
+|----------|---------|-----|
+| Node Feature Discovery | `stable` | `nfd.4.22.0-202610140833` |
+| NVIDIA GPU Operator | `stable` | `gpu-operator-certified.v26.7.2` |
+| Red Hat OpenShift AI | `stable-3.x` | `rhods-operator.3.5.2` |
+| cert-manager Operator for Red Hat OpenShift | `stable-v1` | `cert-manager-operator.v1.20.1` |
+| Cluster Observability Operator | `stable` | `cluster-observability-operator.v1.5.3` |
+| Red Hat build of OpenTelemetry | `stable` | `opentelemetry-operator.v0.158.0-202610151241` |
+| Red Hat build of Kueue | `stable-v1.4` | `kueue-operator.v1.4.3` |
+
+OpenShift itself is CVO `stable-4.22` at **4.22.18**. That is not an OLM
+Subscription; it does not auto-roll until an admin sets a desired update.
 
 `full-setup.sh` is presenter rehearsal: 1 × `g2-standard-48` (4 L4). Class
 capacity is `setup/scale-students.sh` (three `g2-standard-24`).
@@ -30,11 +48,14 @@ GCP IPI cluster  (asia-southeast1)
      GPU Operator → allocatable nvidia.com/gpu=4 or 2
      DCGM exporter :9400 → ServiceMonitor → cluster Prometheus
      DSCI metrics stack (COO) → OpenShift AI Observe & monitor
+     vLLM :8080 → KServe ServiceMonitor → DSCI collector → kserve_vllm:* recording rules
+       (redhat-ods-monitoring) → Observe Dashboard Models / LLM Performance
           │
           ▼
      HardwareProfiles + Kueue ResourceFlavors l4-gpu-4 / l4-gpu-2
-     LocalQueue workshop      → ClusterQueue gpu-pool-2l4
-     LocalQueue workshop-4gpu → ClusterQueue gpu-pool-4l4 (telco-ops-demo)
+     LocalQueue workshop      → ClusterQueue gpu-pool-2l4 (telco-ran-ai, telco-core-ai; 6 GPU class day)
+     LocalQueue workshop      → ClusterQueue gpu-pool-4l4 (telco-ops-demo 1/2 GPU)
+     LocalQueue workshop-4gpu → ClusterQueue gpu-pool-4l4 (telco-ops-demo 4-GPU stretch)
      Data Science Projects (telco-ops-demo, telco-ran-ai, telco-core-ai) — Kueue
      telco-ops-notebooks — CPU Jupyter workbench, no LocalQueue
      Model Registry workshop (rhoai-model-registries, evaluation PostgreSQL)
@@ -75,23 +96,34 @@ NVIDIA L4 on G2:
 `scale-gpu.sh --4l4` / `--2l4` changes **node count**. It does not shard one
 replica across nodes. Do not add a second 4-L4 node.
 
+Kueue cohort: rehearsal (`gpu-pool-2l4` GPU quota 0) shares `cohortName:
+workshop-gpu` with `gpu-pool-4l4` so students borrow the presenter node.
+Class day removes the cohort. Same-cohort borrow would admit a 7th student
+GPU onto the 4-L4 node; the next pod in a namespace already at ResourceQuota
+4 is then API **Forbidden**, never SchedulingGated.
+
 ## Packing
 
 **Rehearsal** (1 × 4-L4): C3+C4 share the node; C6 2-GPU tensor parallel uses
 half; a 4-GPU stretch consumes the whole node.
 
 **Class** (10 L4): C6 2-GPU tensor parallel uses a **whole 2-L4 node**; the
-4-GPU stretch stays on the 4-L4 node. Tenant ResourceQuota remains 2 GPU on
-`telco-ran-ai` and `telco-core-ai`.
+4-GPU stretch stays on the 4-L4 node. Tenant ResourceQuota is **5 GPU** on
+`telco-ran-ai` and `telco-core-ai` so 5+5 oversubscribes the 6 GPU
+`gpu-pool-2l4` (Kueue can queue). A 2+2 quota would hit Forbidden first and
+hide Kueue. 5 (not 4) also absorbs KServe `maxSurge=25%`: at 4 replicas the
+predictor Deployment may create a 5th pod while the old ReplicaSet is still
+up. ClusterQueues are **not** in a cohort on class day, so that 6 cannot
+borrow the presenter 4-L4.
 
 ## Tenancy
 
 | Project | Role | GPU cap |
 |---------|------|---------|
-| `telco-ops-demo` | Presenter serving | Shared Kueue pools (`workshop` + `workshop-4gpu`) |
+| `telco-ops-demo` | Presenter serving | `gpu-pool-4l4` only (`workshop` + `workshop-4gpu`) |
 | `telco-ops-notebooks` | Presenter Jupyter | CPU workbench, no Kueue LocalQueue |
-| `telco-ran-ai` | Playground tenant A | ResourceQuota 2 GPU |
-| `telco-core-ai` | Playground tenant B | ResourceQuota 2 GPU |
+| `telco-ran-ai` | Playground tenant A | ResourceQuota 5 GPU (shared Kueue pool 6) |
+| `telco-core-ai` | Playground tenant B | ResourceQuota 5 GPU (shared Kueue pool 6) |
 
 Kueue-managed projects only list queue-backed HardwareProfiles in the
 dashboard, which is why the CPU Jupyter workbench is in `telco-ops-notebooks`
@@ -101,12 +133,19 @@ The workbench clones
 https://github.com/rh-aiservices-bu/llm-on-openshift onto its PVC. The
 LangChain memory notebook talks to an in-cluster vLLM predictor after C3.
 
-This lab’s HTPasswd users are `cluster-admin` so students can `oc login`
-without extra RoleBindings. Isolation is still ResourceQuota, Kueue,
-NetworkPolicy, and per-project tokens. The 2 GPU tenant cap is an OpenShift
-`ResourceQuota` (`gpu-quota` on `telco-ran-ai` / `telco-core-ai`), not an
-OpenShift AI Settings form. Hardware profiles set per-deploy GPU requests;
-Kueue `ClusterQueue` `nominalQuota` is pool admission.
+This lab’s HTPasswd users are `cluster-admin` so platform engineers can
+`oc login` without extra RoleBindings and inspect nodes, queues, Observe, and
+operators. That is a **classroom shortcut**, not production tenancy: a student
+can switch Data Science Projects and patch quota. Kueue is still on every GPU
+deploy (`kueue.openshift.io/managed=true`, HardwareProfile queue `workshop` →
+ClusterQueue `gpu-pool-2l4`, 6 GPU on class day). The tenant cap is an
+OpenShift `ResourceQuota` of **5** GPU (`gpu-quota` on `telco-ran-ai` /
+`telco-core-ai`), not an OpenShift AI Settings form. Hardware profiles set
+per-deploy GPU requests; Kueue `ClusterQueue` `nominalQuota` is pool
+admission. 5+5 > 6 is required so students can see SchedulingGated, not only
+Forbidden (and so a 4-replica rolling update does not Forbidden the surge pod). Real isolation would drop `cluster-admin` and use IdP groups plus
+OpenShift AI user (not administrator) access on one project each — see
+playground P6.
 
 ## Model Registry
 

@@ -2,7 +2,8 @@
 # Health check after overnight shutdown. --fix is known recovery only
 # (per-pool GPU MachineSet from 0, Let's Encrypt re-issue under 30 days,
 # dashboard flags, DSC ogx status, NemoGuardrails list CRD, MCP catalog lock,
-# Open WebUI bounce). --fix does not clone MachineSets or start stopped VMs.
+# Open WebUI bounce, re-apply Manual operator Subscription pins).
+# --fix does not clone MachineSets or start stopped VMs.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -67,8 +68,44 @@ check_csv() {
 check_csv "openshift-nfd" "nfd" "NFD Operator"
 check_csv "nvidia-gpu-operator" "gpu-operator" "GPU Operator"
 check_csv "redhat-ods-operator" "rhods-operator" "OpenShift AI Operator"
-check_csv "cert-manager-operator" "cert-manager" "cert-manager"
+check_csv "cert-manager-operator" "cert-manager-operator" "cert-manager"
+check_csv "openshift-cluster-observability-operator" "cluster-observability-operator" "Cluster Observability Operator"
+check_csv "openshift-opentelemetry-operator" "opentelemetry-operator" "OpenTelemetry Operator"
 check_csv "openshift-kueue-operator" "kueue-operator" "Kueue Operator"
+
+# Subscriptions must stay Manual + startingCSV so a catalog z-stream cannot
+# auto-approve mid-workshop. Values match manifests/operators/*-subscription.yaml.
+SUB_PIN_FAIL=0
+check_subscription_pin() {
+  local ns="$1" sub="$2" want_csv="$3" label="$4"
+  local approval csv installed
+  approval="$(oc get subscription.operators.coreos.com "${sub}" -n "${ns}" -o jsonpath='{.spec.installPlanApproval}' 2>/dev/null || true)"
+  csv="$(oc get subscription.operators.coreos.com "${sub}" -n "${ns}" -o jsonpath='{.spec.startingCSV}' 2>/dev/null || true)"
+  installed="$(oc get subscription.operators.coreos.com "${sub}" -n "${ns}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)"
+  if [ "${approval}" = "Manual" ] && [ "${csv}" = "${want_csv}" ]; then
+    pass "${label}: Manual pin ${csv} (installed ${installed:-none})"
+  else
+    SUB_PIN_FAIL=1
+    fail "${label}: approval='${approval:-missing}' startingCSV='${csv:-missing}' (want Manual ${want_csv})"
+  fi
+}
+check_subscription_pin "openshift-nfd" "nfd" "nfd.4.22.0-202610140833" "NFD Subscription"
+check_subscription_pin "nvidia-gpu-operator" "gpu-operator-certified" "gpu-operator-certified.v26.7.2" "GPU Operator Subscription"
+check_subscription_pin "redhat-ods-operator" "rhods-operator" "rhods-operator.3.5.2" "OpenShift AI Subscription"
+check_subscription_pin "cert-manager-operator" "openshift-cert-manager-operator" "cert-manager-operator.v1.20.1" "cert-manager Subscription"
+check_subscription_pin "openshift-cluster-observability-operator" "cluster-observability-operator" "cluster-observability-operator.v1.5.3" "COO Subscription"
+check_subscription_pin "openshift-opentelemetry-operator" "opentelemetry-product" "opentelemetry-operator.v0.158.0-202610151241" "OpenTelemetry Subscription"
+check_subscription_pin "openshift-kueue-operator" "kueue-operator" "kueue-operator.v1.4.3" "Kueue Subscription"
+if [ "${SUB_PIN_FAIL}" -eq 1 ] && [ "${FIX}" -eq 1 ]; then
+  echo "        Re-applying manifests/operators/*-subscription.yaml (Manual + startingCSV)..."
+  apply_operator_manifest "${SCRIPT_DIR}/../manifests/operators/nfd-subscription.yaml" || true
+  apply_operator_manifest "${SCRIPT_DIR}/../manifests/operators/gpu-operator-subscription.yaml" || true
+  apply_operator_manifest "${SCRIPT_DIR}/../manifests/operators/rhoai-subscription.yaml" || true
+  apply_operator_manifest "${SCRIPT_DIR}/../manifests/operators/cert-manager-subscription.yaml" || true
+  apply_operator_manifest "${SCRIPT_DIR}/../manifests/operators/coo-subscription.yaml" || true
+  apply_operator_manifest "${SCRIPT_DIR}/../manifests/operators/opentelemetry-subscription.yaml" || true
+  apply_operator_manifest "${SCRIPT_DIR}/../manifests/operators/kueue-subscription.yaml" || true
+fi
 
 section "3. GPU MachineSets and capacity"
 MAC_REPLICAS="$(oc get deploy machine-api-controllers -n openshift-machine-api \
@@ -306,16 +343,54 @@ else
   fi
 fi
 
+for ns in telco-ran-ai telco-core-ai; do
+  RQ_GPU="$(oc get resourcequota gpu-quota -n "${ns}" -o jsonpath='{.spec.hard.requests\.nvidia\.com/gpu}' 2>/dev/null || true)"
+  if [ "${RQ_GPU}" = "5" ]; then
+    pass "ResourceQuota gpu-quota=5 in ${ns} (oversubscribes 6-GPU student pool; absorbs maxSurge)"
+  else
+    fail "ResourceQuota gpu-quota in ${ns} is '${RQ_GPU:-missing}' (want 5; 2 or 4 hides Kueue behind Forbidden)"
+    if [ "${FIX}" -eq 1 ]; then
+      oc apply -f "${SCRIPT_DIR}/../manifests/projects/resourcequotas.yaml" || true
+    fi
+  fi
+done
+
+PRES_LQ="$(oc get localqueue workshop -n telco-ops-demo -o jsonpath='{.spec.clusterQueue}' 2>/dev/null || true)"
+if [ "${PRES_LQ}" = "gpu-pool-4l4" ]; then
+  pass "Presenter LocalQueue workshop → gpu-pool-4l4 (student 6-GPU pool stays exclusive)"
+else
+  fail "Presenter LocalQueue workshop → '${PRES_LQ:-missing}' (want gpu-pool-4l4)"
+  if [ "${FIX}" -eq 1 ]; then
+    # spec.clusterQueue is immutable — delete and recreate from Git.
+    oc delete localqueue workshop -n telco-ops-demo --ignore-not-found
+    oc apply -f "${SCRIPT_DIR}/../manifests/kueue/local-queues.yaml" || true
+  fi
+fi
+
 if oc get clusterqueue gpu-pool-4l4 &>/dev/null && oc get clusterqueue gpu-pool-2l4 &>/dev/null; then
   pass "Kueue ClusterQueues gpu-pool-4l4 and gpu-pool-2l4"
   CQ_COHORT4="$(oc get clusterqueue gpu-pool-4l4 -o jsonpath='{.spec.cohortName}' 2>/dev/null || true)"
   CQ_COHORT2="$(oc get clusterqueue gpu-pool-2l4 -o jsonpath='{.spec.cohortName}' 2>/dev/null || true)"
-  if [ "${CQ_COHORT4}" = "workshop-gpu" ] && [ "${CQ_COHORT2}" = "workshop-gpu" ]; then
-    pass "ClusterQueues share cohortName workshop-gpu (rehearsal borrow)"
+  LIVE2_INFO="$(find_gpu_machineset 2l4 2>/dev/null || true)"
+  LIVE2_N="${LIVE2_INFO##*|}"
+  LIVE2_N="${LIVE2_N:-0}"
+  if [ "${LIVE2_N}" != "0" ] && [ -n "${LIVE2_N}" ]; then
+    if [ -z "${CQ_COHORT2}" ] && [ -z "${CQ_COHORT4}" ]; then
+      pass "ClusterQueues have no cohort on class day (students cannot borrow presenter 4-L4)"
+    else
+      fail "Class-day ClusterQueues still share cohort (${CQ_COHORT2:-empty}/${CQ_COHORT4:-empty}); P5 hits ResourceQuota instead of Kueue"
+      if [ "${FIX}" -eq 1 ]; then
+        sync_kueue_gpu_quotas "$(find_gpu_machineset 4l4 | awk -F'|' '{print $NF}')" "${LIVE2_N}" || true
+      fi
+    fi
   else
-    fail "ClusterQueue cohortName missing (v1beta2 uses cohortName, not cohort); C3 stays SchedulingGated"
-    if [ "${FIX}" -eq 1 ]; then
-      oc apply -f "${SCRIPT_DIR}/../manifests/kueue/cluster-queue.yaml" || true
+    if [ "${CQ_COHORT4}" = "workshop-gpu" ] && [ "${CQ_COHORT2}" = "workshop-gpu" ]; then
+      pass "ClusterQueues share cohortName workshop-gpu (rehearsal borrow)"
+    else
+      fail "Rehearsal ClusterQueue cohortName missing (v1beta2 uses cohortName, not cohort); C3 stays SchedulingGated"
+      if [ "${FIX}" -eq 1 ]; then
+        oc apply -f "${SCRIPT_DIR}/../manifests/kueue/cluster-queue.yaml" || true
+      fi
     fi
   fi
 else
@@ -349,16 +424,21 @@ for ns in ${DS_PROJECTS}; do
     fail "workshop-infer SA or NetworkPolicy missing in ${ns} (Observe models stay No data)"
   fi
 done
-if ! oc get prometheusrule kserve-vllm-recording-rules -n "${PRESENTER_PROJECT}" &>/dev/null; then
-  AUTH_OK=0
-  fail "PrometheusRule kserve-vllm-recording-rules missing (Observe Deployed models stays No data)"
+if oc get prometheusrule.monitoring.rhobs kserve-vllm-recording-rules -n redhat-ods-monitoring &>/dev/null; then
+  pass "PrometheusRule kserve-vllm-recording-rules in redhat-ods-monitoring (Observe Models)"
 else
-  pass "PrometheusRule kserve-vllm-recording-rules"
+  AUTH_OK=0
+  fail "PrometheusRule kserve-vllm-recording-rules missing in redhat-ods-monitoring (Observe Deployed models stays No data)"
+fi
+if oc get prometheusrule.monitoring.coreos.com kserve-vllm-recording-rules -n "${PRESENTER_PROJECT}" &>/dev/null; then
+  AUTH_OK=0
+  fail "Stale user-workload PrometheusRule kserve-vllm-recording-rules still in ${PRESENTER_PROJECT} (DSCI cannot see it)"
 fi
 if [ "${AUTH_OK}" -eq 0 ] && [ "${FIX}" -eq 1 ]; then
   echo "        Re-applying inference-auth.yaml, networkpolicies.yaml, kserve-vllm-prometheusrule.yaml..."
   oc apply -f "${SCRIPT_DIR}/../manifests/projects/inference-auth.yaml" || true
   oc apply -f "${SCRIPT_DIR}/../manifests/projects/networkpolicies.yaml" || true
+  oc delete prometheusrule.monitoring.coreos.com kserve-vllm-recording-rules -n "${PRESENTER_PROJECT}" --ignore-not-found || true
   oc apply -f "${SCRIPT_DIR}/../manifests/projects/kserve-vllm-prometheusrule.yaml" || true
 fi
 

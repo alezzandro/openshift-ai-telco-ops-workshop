@@ -16,7 +16,7 @@ You cannot horizontal-scale a 4-GPU tensor-parallel service on a single 4-GPU no
 . Set min replicas 1 and max replicas 2 (dashboard deployment / scaling fields).
 . Show two pods, two GPUs.
 
-Optional: try a third replica and watch it **queue** in Kueue or stay Pending (only 4 GPUs; other work may still hold cards).
+Optional: a third replica still fits on the presenter 4-L4 pool. A *fifth* GPU against `gpu-pool-4l4` stays **SchedulingGated** (Kueue). Student playgrounds use a different pool (`gpu-pool-2l4`, 6 GPU) — that demo is C8 / P5, not this click.
 
 == After scale-out
 

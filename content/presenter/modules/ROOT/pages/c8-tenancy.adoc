@@ -13,14 +13,14 @@ One GPU pool, two application teams. Same idea as a shared device pool with quot
 | Data Science Project
 | Namespace + dashboard RBAC
 
-| ResourceQuota (2 GPU)
-| Hard cap on `{ran_project}` and `{core_project}`
+| ResourceQuota (5 GPU)
+| Namespace ceiling on `{ran_project}` and `{core_project}` (6th GPU → Forbidden)
 
-| Kueue LocalQueue `workshop`
-| Admission / fair share against ClusterQueue `gpu-pool-2l4` (borrows 4-L4 during rehearsal)
+| Kueue LocalQueue `workshop` (students)
+| Admission against ClusterQueue `gpu-pool-2l4` — **6 GPU** on class day (7th GPU across both tenants → SchedulingGated)
 
-| Kueue LocalQueue `workshop-4gpu`
-| 4-GPU stretch only (`telco-ops-demo` → `gpu-pool-4l4`)
+| Kueue LocalQueue `workshop` / `workshop-4gpu` (presenter)
+| `{presenter_project}` → ClusterQueue `gpu-pool-4l4` (the 4-L4 node). Presenter 1/2-GPU deploys stay off the student pool.
 
 | NetworkPolicy
 | Playground and ingress may reach predictors; students stay in their project
@@ -29,9 +29,15 @@ One GPU pool, two application teams. Same idea as a shared device pool with quot
 | External Route requires a bearer token with `get` on InferenceServices in *that* project
 |===
 
-== Where the 2 GPU cap is set
+== Where the 5 GPU cap is set
 
 The tenant GPU cap is an **OpenShift** `ResourceQuota` on the Data Science Project namespace. OpenShift AI does **not** have a separate dashboard form that replaces that object. What you *do* configure in OpenShift AI is how a *single* workload asks for GPUs, and how the *pool* admits work.
+
+**Why 5, not 2.** Class day gives students **6 GPU** in `gpu-pool-2l4`. A ResourceQuota of 2+2 = 4 is *below* that pool, so a student always gets **Forbidden** with idle cards still in Kueue — they never see a queue. 5+5 = 10 oversubscribes 6: the 6th GPU in *one* project is ResourceQuota; the 7th GPU *across both* projects is Kueue.
+
+**Why 5, not 4.** KServe predictor Deployments use RollingUpdate `maxSurge=25%`. Scaling 3 → 4 (or any new ReplicaSet) can create a 5th pod while the old ReplicaSet still holds three Running pods. Quota 4 then returns **Forbidden** `used=4` even though Kueue already gated the 4th pod. Quota 5 lets that surge pod exist so Kueue can gate it too.
+
+**Why no cohort on class day.** Rehearsal puts both ClusterQueues in cohort `workshop-gpu` so students can borrow the 4-L4 node. If you leave that cohort after `scale-students.sh`, Kueue admits the 7th student GPU onto the presenter node (`flavorsReservation` `l4-gpu-4` borrowed=1). That extra admitted GPU fills the tenant ResourceQuota and the next replica is **Forbidden**, not SchedulingGated. `sync_kueue_gpu_quotas` drops the cohort when 2-L4 replicas > 0.
 
 https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/quotas[Resource quotas (OpenShift 4.22)]
 
@@ -45,7 +51,7 @@ https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/h
 
 | **OpenShift**
 | `ResourceQuota` `gpu-quota`
-| Hard cap: `{ran_project}` and `{core_project}` cannot request more than **2** `nvidia.com/gpu` in total. The API returns **Forbidden** (`exceeded quota`) if a third GPU would start. `{presenter_project}` has no GPU ResourceQuota — the presenter shares the Kueue pools.
+| Hard cap: `{ran_project}` and `{core_project}` cannot request more than **5** `nvidia.com/gpu` in total. The API returns **Forbidden** (`exceeded quota`) if a sixth GPU would start. `{presenter_project}` has no GPU ResourceQuota — its LocalQueue uses `gpu-pool-4l4`, not the student 6.
 | OpenShift console → **Administration → ResourceQuotas**, or `oc describe resourcequota gpu-quota -n {ran_project}`. Setup applies `manifests/projects/resourcequotas.yaml`. **Not** Settings in OpenShift AI.
 
 | **OpenShift AI**
@@ -55,7 +61,7 @@ https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/h
 
 | **OpenShift AI / Kueue**
 | `ClusterQueue` `nominalQuota`
-| Fair-share admission for the **cluster GPU pool**. Excess work stays **SchedulingGated** / queued instead of stealing another team's cards. That is pool quota, not the tenant 2 GPU hard cap.
+| Fair-share admission for the **student GPU pool** (`gpu-pool-2l4` = 6 on class day). Excess work stays **SchedulingGated** / queued. That is pool quota, not the tenant 5 GPU hard cap.
 | `ClusterQueue` / `LocalQueue` (this lab: setup). OpenShift AI can auto-create queues when `autoCreateQueues: true`; this lab manages them in Git.
 |===
 
@@ -67,13 +73,25 @@ Talking point: Hardware profile answers "how big is this serving pod?" ResourceQ
 . **AI hub → Registry** → **workshop** → the Ministral version from C3 → ⋮ → **Deploy** into `{ran_project}` on *NVIDIA L4 - 1 GPU*. Same registered artifact, different project — that is the tenancy story. Do not deploy from the catalog card.
 . Advanced settings: **Model access**, **Require token authentication**, service account `workshop-infer`.
 . From a laptop, curl the **ran** Route with a `workshop-infer` token minted in `{ran_project}`. Then curl the **presenter** Route with that same token — expect **401**. Isolation is the Data Science Project plus token auth, not Open WebUI.
-. Try a third 1-GPU deploy in `{ran_project}` after that tenant already holds 2 GPUs — expect **Forbidden** (`exceeded quota: gpu-quota`). If the *pool* is full instead, Kueue leaves the workload **SchedulingGated**. Neither path silently steals the presenter's cards.
+. ResourceQuota: in `{ran_project}` hold 5 GPU (`minReplicas=5` on a 1-GPU Ministral). A sixth replica is **Forbidden** (`exceeded quota: gpu-quota`). The 2-L4 pool still has 1 GPU free — that is *not* Kueue.
+. Kueue: both playground projects at 3 GPU each (6 used of 6). Scale **one** of them to 4 (one extra replica only). The extra predictor stays **SchedulingGated**; `oc get workloads.kueue.x-k8s.io` shows `ADMITTED=False`. A rolling update may also create a 5th surge pod — that one is gated too. If you instead see **Forbidden** `used=5`, scale that project back to 3 and retry +1.
+. **Do not look for the word "Kueue" on the serving page.** OpenShift AI 3.5 shows Kueue states (`Queued`, `Inadmissible`) on **Workbenches**, not on **AI hub → Deployments**. Show these instead:
+ **OpenShift console → Workloads → Pods** — status **SchedulingGated**; pod Details scheduling gates `kueue.x-k8s.io/admission`.
+ **Home → Search → Workload** (`kueue.x-k8s.io`) — pending object, `QuotaReserved=False`, message `insufficient unused quota for nvidia.com/gpu in flavor l4-gpu-2`.
+ **Search → LocalQueue** `workshop` (pending count) and **ClusterQueue** `gpu-pool-2l4` (`pendingWorkloads`, GPU usage 6/6).
+ OpenShift AI **Observe & monitor → Infrastructure → Cluster queue consumption** (pool graph; wait out `storage is (re)initializing`).
+ CLI: `oc describe workloads.kueue.x-k8s.io -n {core_project}` (or `{ran_project}`).
 
 Talking points:
 
-* Tenancy is the Data Science Project, ResourceQuota, Kueue, NetworkPolicy, and per-project tokens.
+* **Do not oversell isolation.** Students are `cluster-admin`. P6 is a demo of the *objects* (project, quota, queue, token, NetworkPolicy), not a locked-down tenant cluster.
+* Kueue is already on every dashboard GPU deploy (Hardware profile *NVIDIA L4 - 1 GPU* → LocalQueue `workshop`). A sixth GPU in one tenant project is **Forbidden** ResourceQuota. Kueue is **SchedulingGated** when both tenants together go past 6. The serving UI will not say "Kueue"; the Workload CR and the scheduling gate will.
 * Do not send students to Open WebUI Direct Connections (`*.svc.cluster.local` is not reachable from a browser). They use the Route + token, or **Gen AI studio → Playground** in their project.
 
 == Student RBAC
 
-This lab logs in with HTPasswd `admin` / `student1`–`student9`, all bound as `cluster-admin` so students can use `oc` without extra RoleBindings. Tenant **ResourceQuota 2 GPU** on `{ran_project}` and `{core_project}` still caps serving. In production, students would be namespace admin only and must not patch `ClusterPolicy`, `DataScienceCluster`, MachineSets, or Nodes.
+This lab logs in with HTPasswd `admin` / `student1`–`student9`, all bound as `cluster-admin` so platform engineers get an advanced view: `oc` without extra RoleBindings, Observe GPU/Kueue, Nodes, Hardware profiles, ClusterQueues, operators, OpenShift MCP. That is why the playground is **not** real multitenancy — a student can switch projects and patch quota.
+
+Say that out loud. Then show what you *would* do in production: IdP groups, OpenShift AI **user** group (not administrator), dashboard Permissions on one Data Science Project, keep `ResourceQuota` + Kueue + NetworkPolicy + per-project tokens, never bind application teams as `cluster-admin`.
+
+Student page: playground **P5** (where Kueue runs) and **P6** (lab vs real isolation).

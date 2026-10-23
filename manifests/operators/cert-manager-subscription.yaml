@@ -17,7 +17,9 @@ metadata:
   namespace: cert-manager-operator
 spec:
   channel: stable-v1
-  installPlanApproval: Automatic
   name: openshift-cert-manager-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
+  # Pin: cert-manager Operator 1.20.1 on the class cluster (2026-10-23).
+  startingCSV: cert-manager-operator.v1.20.1
+  installPlanApproval: Manual

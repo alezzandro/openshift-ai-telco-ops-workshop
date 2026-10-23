@@ -401,8 +401,11 @@ print(n)
   return 1
 }
 
-# Rehearsal: 2-L4 quota 0; LocalQueue workshop borrows the 4-L4 flavor.
-# Class: 2-L4 listed first with quota 6 so 1/2-GPU jobs prefer student nodes.
+# Rehearsal (r2=0): both ClusterQueues share cohort workshop-gpu so student
+# LocalQueue workshop can borrow unused 4-L4 quota.
+# Class (r2>0): drop the cohort. Same-cohort borrow lets gpu-pool-2l4 take
+# presenter 4-L4 GPUs after the 6 student cards fill, so P5 hits ResourceQuota
+# instead of Kueue SchedulingGated.
 sync_kueue_gpu_quotas() {
   local r4="${1:-0}"
   local r2="${2:-0}"
@@ -435,6 +438,27 @@ def apply(cq):
         md.pop(k, None)
     subprocess.run(["oc", "apply", "-f", "-"], input=json.dumps(cq), text=True, check=True)
 
+def drop_cohort(name):
+    # oc apply cannot remove spec.cohortName; JSON patch can.
+    live = load(name)
+    spec = live.get("spec") or {}
+    if "cohortName" not in spec and "cohort" not in spec:
+        print(f"ClusterQueue {name} already has no cohortName")
+        return
+    p = subprocess.run(
+        [
+            "oc", "patch", "clusterqueue", name, "--type=json",
+            "-p", '[{"op":"remove","path":"/spec/cohortName"}]',
+        ],
+        capture_output=True,
+        text=True,
+    )
+    err = (p.stdout or "") + (p.stderr or "")
+    if p.returncode == 0:
+        print(f"ClusterQueue {name} cohortName removed (class day, no borrow)")
+        return
+    print(f"  [WARN] could not drop cohortName on {name}: {err.strip()[:200]}", file=sys.stderr)
+
 try:
     cq4 = load("gpu-pool-4l4")
 except subprocess.CalledProcessError:
@@ -446,8 +470,13 @@ if cq4 is not None:
     groups[0]["flavors"] = [flavor("l4-gpu-4", q4)]
     spec = cq4.setdefault("spec", {})
     spec.pop("cohort", None)
-    spec["cohortName"] = "workshop-gpu"
+    if r2 > 0:
+        spec.pop("cohortName", None)
+    else:
+        spec["cohortName"] = "workshop-gpu"
     apply(cq4)
+    if r2 > 0:
+        drop_cohort("gpu-pool-4l4")
     print(f"ClusterQueue gpu-pool-4l4 nvidia.com/gpu nominalQuota={q4}")
 
 try:
@@ -474,13 +503,21 @@ if cq2 is not None:
         groups.append({"coveredResources": ["cpu", "memory", "nvidia.com/gpu"], "flavors": []})
     two = flavor("l4-gpu-2", q2, cpu="64", mem="256Gi")
     four = flavor("l4-gpu-4", "0")
-    # Class: 2-L4 first. Rehearsal: 4-L4 first (borrow presenter node).
-    groups[0]["flavors"] = [two, four] if r2 > 0 else [four, two]
+    # Class: only the 2-L4 flavor so student jobs cannot land on the
+    # presenter node. Rehearsal: 4-L4 flavor first (borrow).
+    groups[0]["flavors"] = [two] if r2 > 0 else [four, two]
     spec = cq2.setdefault("spec", {})
     spec.pop("cohort", None)
-    spec["cohortName"] = "workshop-gpu"
+    if r2 > 0:
+        spec.pop("cohortName", None)
+    else:
+        spec["cohortName"] = "workshop-gpu"
     apply(cq2)
-    print(f"ClusterQueue gpu-pool-2l4 flavors order={'2l4-first' if r2 > 0 else '4l4-first'} gpu2={q2} gpu4=0 (borrow)")
+    if r2 > 0:
+        drop_cohort("gpu-pool-2l4")
+        print(f"ClusterQueue gpu-pool-2l4 flavors order=2l4-first gpu2={q2} gpu4=0 (no cohort, no 4-L4 borrow)")
+    else:
+        print(f"ClusterQueue gpu-pool-2l4 flavors order=4l4-first gpu2={q2} gpu4=0 (cohort borrow)")
 PY
 }
 

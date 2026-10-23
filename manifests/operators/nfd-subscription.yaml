@@ -22,4 +22,7 @@ spec:
   name: nfd
   source: redhat-operators
   sourceNamespace: openshift-marketplace
-  installPlanApproval: Automatic
+  # Pin: OpenShift 4.22.18 class cluster (2026-10-23). Manual so a catalog
+  # z-stream cannot roll NFD mid-workshop.
+  startingCSV: nfd.4.22.0-202610140833
+  installPlanApproval: Manual

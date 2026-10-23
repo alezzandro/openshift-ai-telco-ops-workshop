@@ -78,14 +78,23 @@ That keeps the pre-existing Cloud DNS zone.
 | `lego` | Let’s Encrypt DNS-01 against Cloud DNS |
 | `curl` | Health checks and Open WebUI admin signup |
 
-## OpenShift AI 3.5
+## OpenShift AI 3.5.2
 
-The setup installs the Red Hat OpenShift AI operator from `redhat-operators` on channel `stable-3.x`, plus:
+The setup installs operators from the Red Hat / certified catalogs with
+`installPlanApproval: Manual` and a pinned `startingCSV` (see
+`manifests/operators/` and [architecture.md](architecture.md)):
 
-- Node Feature Discovery (`redhat-operators`)
-- NVIDIA GPU Operator (`certified-operators`, package `gpu-operator-certified`)
-- cert-manager Operator for Red Hat OpenShift (Kueue prerequisite only; cluster certs are Let’s Encrypt via `lego`)
-- Red Hat build of Kueue (`kueue-operator`)
+| Operator | Channel | CSV |
+|----------|---------|-----|
+| Node Feature Discovery | `stable` | `nfd.4.22.0-202610140833` |
+| NVIDIA GPU Operator | `stable` | `gpu-operator-certified.v26.7.2` |
+| Red Hat OpenShift AI | `stable-3.x` | `rhods-operator.3.5.2` |
+| cert-manager Operator for Red Hat OpenShift | `stable-v1` | `cert-manager-operator.v1.20.1` |
+| Cluster Observability Operator | `stable` | `cluster-observability-operator.v1.5.3` |
+| Red Hat build of OpenTelemetry | `stable` | `opentelemetry-operator.v0.158.0-202610151241` |
+| Red Hat build of Kueue | `stable-v1.4` | `kueue-operator.v1.4.3` |
+
+cert-manager is a Kueue prerequisite only; cluster certs are Let’s Encrypt via `lego`.
 
 Ray, Training, and pipelines stay **Removed** so GPUs stay on serving.
 Model Registry stays **Managed**. The MCP Lifecycle Operator is set to

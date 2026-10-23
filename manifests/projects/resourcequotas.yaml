@@ -1,3 +1,11 @@
+# Student namespace ceiling is 5 GPU, not 2. Class-day ClusterQueue
+# gpu-pool-2l4 has 6 GPU (3 × 2-L4). If ResourceQuota summed to ≤ 6, a
+# tenant would always get Forbidden before Kueue could queue. 5+5 = 10
+# oversubscribes the pool: the 6th GPU in *one* project is ResourceQuota;
+# the 7th GPU across both projects is Kueue SchedulingGated.
+# 5 (not 4) absorbs KServe predictor RollingUpdate maxSurge=25%: at
+# minReplicas=4 the Deployment may create a 5th pod while the old ReplicaSet
+# is still running. Quota 4 Forbidden that pod even after Kueue gated the 4th.
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -5,8 +13,8 @@ metadata:
   namespace: telco-ran-ai
 spec:
   hard:
-    requests.nvidia.com/gpu: "2"
-    limits.nvidia.com/gpu: "2"
+    requests.nvidia.com/gpu: "5"
+    limits.nvidia.com/gpu: "5"
 ---
 apiVersion: v1
 kind: ResourceQuota
@@ -15,8 +23,8 @@ metadata:
   namespace: telco-core-ai
 spec:
   hard:
-    requests.nvidia.com/gpu: "2"
-    limits.nvidia.com/gpu: "2"
+    requests.nvidia.com/gpu: "5"
+    limits.nvidia.com/gpu: "5"
 ---
 apiVersion: v1
 kind: ResourceQuota

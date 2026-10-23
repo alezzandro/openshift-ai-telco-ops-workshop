@@ -25,4 +25,6 @@ spec:
   name: cluster-observability-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
-  installPlanApproval: Automatic
+  # Pin: Cluster Observability Operator 1.5.3 on the class cluster (2026-10-23).
+  startingCSV: cluster-observability-operator.v1.5.3
+  installPlanApproval: Manual

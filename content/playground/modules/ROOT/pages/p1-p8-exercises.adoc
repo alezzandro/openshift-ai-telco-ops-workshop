@@ -45,6 +45,8 @@ PY
 
 A request without `Authorization` must return **401**. Do not paste `*.svc.cluster.local` into Open WebUI Direct Connections.
 
+OpenShift AI **Observe & monitor → Dashboard → Models** (not **Infrastructure**) should list this deployment. Use the **Project** filter, then **Model deployment**. Request / TTFT charts fill after the curl above. The serving page does not show Kueue; that is xref:p1-p8-exercises.adoc#p5-kueue[P5].
+
 == P2. Hugging Face model from S3
 
 Setup imported `Qwen/Qwen2.5-7B-Instruct` into the demo S4 bucket. Your project already has connection **S4 workshop models (demo)**.
@@ -69,17 +71,106 @@ On rehearsal this shares the presenter 4-L4 node. On class day it uses a whole 2
 
 Open the catalog card for a 70B-class FP16 model (min vRAM ~162 GB). Do **not** register it and do **not** force it onto 4 × 24 GB. Write down why it cannot fit 96 GB (weights plus KV cache). That is the right-size lesson.
 
-== P5. Horizontal scale and queue
+[[p5-kueue]]
+== P5. Horizontal scale and where Kueue actually runs
 
-From the Registry, deploy (or edit) Ministral 14B on 1 GPU with `minReplicas=2`. Try a third replica. Watch Kueue / Pending. Rehearsal has 4 GPUs until the facilitator runs `./setup/scale-students.sh`.
+You have been using **Red Hat build of Kueue** since P1. It is not a separate product you turn on later.
 
-== P6. Isolation
+Your projects `{ran_project}` and `{core_project}` are labeled `kueue.openshift.io/managed=true`. Every GPU Hardware profile in this lab is `scheduling.type: Queue` with LocalQueue **`workshop`**. When you click **Deploy**, OpenShift AI stamps `kueue.x-k8s.io/queue-name=workshop` on the InferenceService. Kueue admits that workload against ClusterQueue **`gpu-pool-2l4`**.
 
-From the other project, deploy the **same** registered Ministral version. Prove you cannot see the other team's InferenceService in **your** OpenShift AI project. Curl *their* Route with *your* `workshop-infer` token — expect **401**. Isolation is the Data Science Project, quota, NetworkPolicy, and token auth.
+On class day that pool is **6 GPU** (three 2-L4 nodes). Your OpenShift `ResourceQuota` `gpu-quota` is **5 GPU** in *your* namespace. The two ceilings are different on purpose: 5+5 = 10 requested would oversubscribe 6, so Kueue can queue. If the quota were 2+2 = 4, you would always hit **Forbidden** with 2 GPUs still idle in the pool, and you would never see Kueue. Quota is **5, not 4**, because the KServe predictor Deployment uses RollingUpdate `maxSurge=25%`: scaling 3 → 4 can create a 5th pod while the old ReplicaSet is still running. Quota 4 Forbidden that extra pod even after Kueue already gated the 4th.
 
-The **2 GPU** cap on `{ran_project}` / `{core_project}` is an OpenShift `ResourceQuota` (`gpu-quota`), not a toggle under OpenShift AI Settings. OpenShift AI Hardware profiles only set how many GPUs *one* deploy requests. Kueue `ClusterQueue` quota is the shared pool (jobs queue when the flavor is full). A third GPU in your project is **Forbidden** (`exceeded quota`). `oc describe resourcequota gpu-quota -n <your-project>`.
+The presenter 4-L4 node is a **different** ClusterQueue (`gpu-pool-4l4`) and, on class day, is **not** in the same Kueue cohort. Students cannot borrow those four cards. If you see `exceeded quota: gpu-quota` on a 4th replica, a leftover 5th pod is still counting against quota, or class-day cohort borrow put a student pod on the presenter node. Scale back to 3 and retry **+1 only**.
+
+Kueue admits **one Workload per predictor pod**, not one Workload per InferenceService. Scale **one replica at a time**.
+
+The extra replica **will not** show a banner that says "Kueue" on **AI hub → Deployments** or on the OpenShift **Deployments** page. OpenShift AI 3.5 paints Kueue states (`Queued`, `Inadmissible`) on the **Workbenches** tab, not on model serving. A gated predictor looks like an ordinary **Pending** / **SchedulingGated** pod. That is expected.
+
+Where the word Kueue actually appears (you are `cluster-admin` on this teaching cluster):
+
+. OpenShift console → **Workloads → Pods** (project `{ran_project}` or `{core_project}`). Status column: **SchedulingGated**. Open the pod → **Details**: scheduling gates `kueue.x-k8s.io/admission` and `kueue.x-k8s.io/topology`. Condition: `Scheduling is blocked due to non-empty scheduling gates`.
+. OpenShift console → **Home → Search** → Resource **Workload** (API group `kueue.x-k8s.io`). The pending row has **Admitted** empty. Open it: condition `QuotaReserved=False` with `couldn't assign flavors to pod set main: insufficient unused quota for nvidia.com/gpu in flavor l4-gpu-2, 1 more needed`. That sentence is Kueue.
+. Same Search → Resource **LocalQueue** `workshop`: **Pending Workloads** is 1 or 2. Resource **ClusterQueue** `gpu-pool-2l4`: `pendingWorkloads` plus `flavorsUsage` `nvidia.com/gpu=6`.
+. OpenShift AI **Observe & monitor → Infrastructure** → **Cluster queue consumption**. Pool `gpu-pool-2l4` at 6/6 GPU with pending workloads. First load can flash `storage is (re)initializing` (API watch cache); wait and retry. This page graphs the queue; it does not put "Queued" on the deployment card.
+. CLI (clearest):
+
+----
+oc get pods -n <your-project>
+oc describe pod -n <your-project> <gated-pod>   # scheduling gates kueue.x-k8s.io/admission
+oc get workloads.kueue.x-k8s.io -n <your-project>
+oc describe workloads.kueue.x-k8s.io -n <your-project> <pending-workload>
+oc get localqueue workshop -n <your-project>
+oc get clusterqueue gpu-pool-2l4
+----
+
+`oc describe resourcequota gpu-quota -n <your-project>` is the other ceiling (Forbidden). If that command shows used < hard and the pod is still gated, you are in Kueue, not ResourceQuota.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-workloads-with-kueue[Manage workloads with Kueue (OpenShift AI 3.5)]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_accelerators/working-with-hardware-profiles_accelerators[Hardware profiles]
 
 https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/quotas[Resource quotas (OpenShift 4.22)]
+
+.Exercise A — ResourceQuota (one project)
+
+. From the Registry, deploy (or edit) Ministral 14B on *NVIDIA L4 - 1 GPU*. Scale `minReplicas` to **5**. That is your namespace ceiling. The shared pool still has 1 GPU free.
+. Try `minReplicas=6`. Expect **Forbidden** (`exceeded quota: gpu-quota`) from the API. That is ResourceQuota, not a Kueue queue.
+
+.Exercise B — Kueue (both projects; this is how you see the queue)
+
+A single tenant at quota 5 cannot fill a 6-GPU pool by itself. You see Kueue when **combined** demand exceeds 6 while each request still fits in ResourceQuota.
+
+. Both projects: set `minReplicas=3` (6 used of 6). Each namespace used=3, still under the 5 GPU ResourceQuota.
+. Pick **one** project. Set `minReplicas=4` (7th GPU against the pool, 4th GPU in that namespace). Expect the extra predictor **SchedulingGated** (or a Kueue Workload with `ADMITTED=False`). A rolling update may also create a 5th surge pod — that one is SchedulingGated too, not Forbidden. `oc get workloads.kueue.x-k8s.io -n <your-project>`. `oc get pods -n <your-project>` shows `SchedulingGated`.
+. If the message is **Forbidden** `exceeded quota: gpu-quota` with `used=5`, you are already at the namespace cap. Scale that project back to 3, confirm the other project is at 3, then retry **+1 only**.
+. Delete the gated replica so the other tenant can work.
+
+On rehearsal (no 2-L4 nodes yet) `gpu-pool-2l4` borrows unused 4-L4 quota. Treat the borrowed pool as 4 GPU, not 6, and skip Exercise B until the facilitator runs `./setup/scale-students.sh`.
+
+[[p6-isolation]]
+== P6. Isolation — lab demo vs real multitenancy
+
+From the other project, deploy the **same** registered Ministral version. In **your** OpenShift AI project, you should not see the other team's InferenceService. Curl *their* Route with *your* `workshop-infer` token — expect **401**.
+
+The **5 GPU** cap on `{ran_project}` / `{core_project}` is an OpenShift `ResourceQuota` (`gpu-quota`), not a toggle under OpenShift AI Settings. Hardware profiles only size *one* deploy. A sixth GPU in your project is **Forbidden** (`exceeded quota`). The **6 GPU** student pool is Kueue ClusterQueue `gpu-pool-2l4`. `oc describe resourcequota gpu-quota -n <your-project>`.
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/quotas[Resource quotas (OpenShift 4.22)]
+
+=== This lab is not real isolation
+
+HTPasswd `student1`–`student9` are bound as **cluster-admin**. That is deliberate: this workshop is for **platform engineers**. `cluster-admin` lets everyone use `oc` without extra RoleBindings, open **Observe & monitor**, inspect Nodes, Hardware profiles, ClusterQueues, and operators, and call the OpenShift MCP server against cluster-scoped objects (P9).
+
+Because of that, **do not treat P6 as multi-tenant security**. You can switch to the other team's Data Science Project, run `oc get inferenceservices -A`, and patch `gpu-quota` or a ClusterQueue. The lab asks you not to. Stay in your assigned project.
+
+What you *did* prove if you stay in role:
+
+* The dashboard project view hides the other team's InferenceService until you switch projects
+* Their Route returns **401** with *your* `workshop-infer` token (that ServiceAccount is namespaced)
+* A sixth GPU in *your* project is **Forbidden** by ResourceQuota (5)
+* The 7th GPU across both student projects stays **SchedulingGated** in Kueue (pool 6)
+* NetworkPolicy still applies unless you (as `cluster-admin`) change it
+
+Those objects are the real product controls. Binding every student as `cluster-admin` turns them into **courtesy**, not enforcement.
+
+=== How you would do this for real
+
+Keep the same OpenShift / OpenShift AI objects. Drop `cluster-admin` on application teams.
+
+. **Identity.** OpenShift groups from your IdP (LDAP/OIDC), not a shared HTPasswd `cluster-admin` list. Bind each group as project Admin on *one* Data Science Project only.
+. **OpenShift AI access.** **Settings → User management**: platform operators in an *administrator* group; RAN / Core teams in a *user* group. Users must not see Settings (Hardware profiles, Kueue).
+. **Project permissions.** Dashboard **Permissions** tab: Admin (or Contributor) on their DSP, nothing on the other tenant and nothing on `{presenter_project}`.
+. **Hard cap.** Keep `ResourceQuota` `gpu-quota` on each tenant namespace. Without `cluster-admin`, a team cannot raise its own quota.
+. **Shared pool.** Keep Kueue: namespace label `kueue.openshift.io/managed=true`, a LocalQueue per project, ClusterQueue `nominalQuota` for the GPU pool. Optionally one ClusterQueue per team for fair-share instead of one `gpu-pool-2l4` with `namespaceSelector: {}`.
+. **Hardware profiles.** Cluster-admin objects. Tenants only *select* them at deploy time.
+. **Network and tokens.** Default-deny NetworkPolicy plus the monitoring scrape exception; per-project tokens on authenticated Routes.
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-users-and-groups[Set up user access and identity (OpenShift AI 3.5)]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_resources/selecting-admin-and-user-groups_resource-mgmt[Selecting OpenShift AI administrator and user groups]
+
+https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_on_projects/managing-access-to-projects_projects[Manage access to projects]
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/authentication_and_authorization/using-rbac[Using RBAC (OpenShift 4.22)]
 
 == P7. `max-model-len`
 

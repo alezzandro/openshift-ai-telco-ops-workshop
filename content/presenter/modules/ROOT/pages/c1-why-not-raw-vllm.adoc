@@ -18,7 +18,7 @@ On vanilla Kubernetes an operations team owns all of this by hand:
 * Model Registry so you version an artifact, then deploy that version (not a tag in chat)
 * HardwareProfiles (1 / 2 / 4 GPU) instead of tribal YAML
 * ServingRuntime templates (RHAIIS vLLM, OpenAI API, probes, `/dev/shm`)
-* Kueue LocalQueues so a third deploy *queues* instead of silently pending
+* Kueue LocalQueues so extra work against a full GPU pool stays SchedulingGated instead of silently pending (a sixth GPU *in one tenant project* is ResourceQuota Forbidden; the 7th across both playgrounds is Kueue — C8)
 * OpenShift Routes and OpenShift AI **Observe & monitor → Infrastructure** (GPU and Kueue queues)
 
 == Click path

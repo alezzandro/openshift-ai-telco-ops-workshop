@@ -121,6 +121,9 @@ oc apply -f "${PROJ_DIR}/resourcequotas.yaml"
 oc apply -f "${PROJ_DIR}/rbac.yaml"
 oc apply -f "${PROJ_DIR}/inference-auth.yaml"
 oc apply -f "${PROJ_DIR}/networkpolicies.yaml"
+# DSCI MonitoringStack (monitoring.rhobs) in redhat-ods-monitoring. A leftover
+# monitoring.coreos.com copy in telco-ops-demo never reaches Observe Models.
+oc delete prometheusrule.monitoring.coreos.com kserve-vllm-recording-rules -n "${PRESENTER_PROJECT}" --ignore-not-found
 oc apply -f "${PROJ_DIR}/kserve-vllm-prometheusrule.yaml"
 echo ""
 
@@ -147,6 +150,12 @@ else
 fi
 oc apply -f "${KUEUE_DIR}/resource-flavor.yaml" || echo "  [WARN] ResourceFlavor apply failed"
 oc apply -f "${KUEUE_DIR}/cluster-queue.yaml" || echo "  [WARN] ClusterQueue apply failed"
+# LocalQueue spec.clusterQueue is immutable. Recreate presenter workshop if
+# it still points at gpu-pool-2l4 from an earlier layout.
+PRES_LQ="$(oc get localqueue workshop -n "${PRESENTER_PROJECT}" -o jsonpath='{.spec.clusterQueue}' 2>/dev/null || true)"
+if [ -n "${PRES_LQ}" ] && [ "${PRES_LQ}" != "gpu-pool-4l4" ]; then
+  oc delete localqueue workshop -n "${PRESENTER_PROJECT}"
+fi
 oc apply -f "${KUEUE_DIR}/local-queues.yaml" || echo "  [WARN] LocalQueue apply failed"
 # Drop the AWS-era single-pool objects if they are still on the cluster.
 oc delete clusterqueue gpu-pool --ignore-not-found

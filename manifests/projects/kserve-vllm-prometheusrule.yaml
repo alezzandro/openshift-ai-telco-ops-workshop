@@ -1,43 +1,63 @@
-# Observe & monitor Models tab queries kserve_vllm:* recording rules.
-# KServe ServiceMonitors scrape raw vllm:* from <isvc>-metrics :8080;
-# this maps those series so Deployed models / request success populate.
-# One copy in the presenter project is enough: user-workload Prometheus
-# evaluates it against all scraped vLLM series.
-# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/deploy_models_using_distributed_inference_with_llm-d/monitoring-llmd-deployments
-apiVersion: monitoring.coreos.com/v1
+# Observe & monitor → Dashboard → Models (and LLM Performance) query
+# kserve_vllm:* on the DSCI MonitoringStack (redhat-ods-monitoring), not
+# user-workload Prometheus. KServe ServiceMonitors already scrape vllm:*;
+# the OpenTelemetry collector rewrites labels to namespace=redhat-ods-monitoring
+# and pod=<collector>. Recording rules copy vllm:* → kserve_vllm:* and restore
+# namespace=<serving project> / pod=<predictor> from exported_namespace /
+# k8s_pod_name so the Models table and model-deployment dropdown populate.
+#
+# API group is monitoring.rhobs (Cluster Observability Operator), same as
+# data-science-accelerator-recording-rules. A monitoring.coreos.com rule in
+# telco-ops-demo is ignored by DSCI and, on user-workload Prometheus, cannot
+# see other namespaces.
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/managing_openshift_ai/managing-observability_managing-rhoai
+apiVersion: monitoring.rhobs/v1
 kind: PrometheusRule
 metadata:
   name: kserve-vllm-recording-rules
-  namespace: telco-ops-demo
+  namespace: redhat-ods-monitoring
   labels:
     workshop.opendatahub.io/component: observe-monitor
-    # Evaluate on user-workload Prometheus (has vllm:* series), not Thanos Ruler.
-    # https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/monitoring/managing-metrics
-    openshift.io/prometheus-rule-evaluation-scope: leaf-prometheus
+    platform.opendatahub.io/part-of: monitoring
 spec:
   groups:
     - name: kserve.vllm.metrics
       interval: 15s
       rules:
         - record: kserve_vllm:num_requests_running
-          expr: vllm:num_requests_running
+          expr: label_replace(label_replace(vllm:num_requests_running, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:num_requests_waiting
-          expr: vllm:num_requests_waiting
+          expr: label_replace(label_replace(vllm:num_requests_waiting, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:request_success_total
-          expr: vllm:request_success_total
+          expr: label_replace(label_replace(vllm:request_success_total, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:prompt_tokens_total
-          expr: vllm:prompt_tokens_total
+          expr: label_replace(label_replace(vllm:prompt_tokens_total, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:generation_tokens_total
-          expr: vllm:generation_tokens_total
+          expr: label_replace(label_replace(vllm:generation_tokens_total, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:e2e_request_latency_seconds_bucket
-          expr: vllm:e2e_request_latency_seconds_bucket
+          expr: label_replace(label_replace(vllm:e2e_request_latency_seconds_bucket, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:e2e_request_latency_seconds_count
-          expr: vllm:e2e_request_latency_seconds_count
+          expr: label_replace(label_replace(vllm:e2e_request_latency_seconds_count, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:e2e_request_latency_seconds_sum
-          expr: vllm:e2e_request_latency_seconds_sum
+          expr: label_replace(label_replace(vllm:e2e_request_latency_seconds_sum, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:time_to_first_token_seconds_bucket
-          expr: vllm:time_to_first_token_seconds_bucket
+          expr: label_replace(label_replace(vllm:time_to_first_token_seconds_bucket, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:time_to_first_token_seconds_count
-          expr: vllm:time_to_first_token_seconds_count
+          expr: label_replace(label_replace(vllm:time_to_first_token_seconds_count, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
         - record: kserve_vllm:time_to_first_token_seconds_sum
-          expr: vllm:time_to_first_token_seconds_sum
+          expr: label_replace(label_replace(vllm:time_to_first_token_seconds_sum, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
+        - record: kserve_vllm:kv_cache_usage_perc
+          expr: label_replace(label_replace(vllm:kv_cache_usage_perc, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
+        - record: kserve_vllm:prefix_cache_hits_total
+          expr: label_replace(label_replace(vllm:prefix_cache_hits_total, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
+        - record: kserve_vllm:prefix_cache_queries_total
+          expr: label_replace(label_replace(vllm:prefix_cache_queries_total, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
+        - record: kserve_vllm:num_preemptions_total
+          expr: label_replace(label_replace(vllm:num_preemptions_total, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
+        # RHAIIS vLLM exports request_time_per_output_token_*; Perses uses time_per_output_token_*.
+        - record: kserve_vllm:time_per_output_token_seconds_bucket
+          expr: label_replace(label_replace(vllm:request_time_per_output_token_seconds_bucket, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
+        - record: kserve_vllm:time_per_output_token_seconds_count
+          expr: label_replace(label_replace(vllm:request_time_per_output_token_seconds_count, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")
+        - record: kserve_vllm:time_per_output_token_seconds_sum
+          expr: label_replace(label_replace(vllm:request_time_per_output_token_seconds_sum, "pod", "$1", "k8s_pod_name", "(.+)"), "namespace", "$1", "exported_namespace", "(.+)")

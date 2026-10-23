@@ -22,4 +22,6 @@ spec:
   name: gpu-operator-certified
   source: certified-operators
   sourceNamespace: openshift-marketplace
-  installPlanApproval: Automatic
+  # Pin: NVIDIA GPU Operator 26.7.2 on the class cluster (2026-10-23).
+  startingCSV: gpu-operator-certified.v26.7.2
+  installPlanApproval: Manual

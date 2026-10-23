@@ -30,11 +30,11 @@ The banner lists live Routes for this cluster. Typical set:
 
 | `{ran_project}`
 | Playground tenant A
-| ResourceQuota 2 GPU
+| ResourceQuota 5 GPU (Kueue pool 6 shared)
 
 | `{core_project}`
 | Playground tenant B
-| ResourceQuota 2 GPU
+| ResourceQuota 5 GPU (Kueue pool 6 shared)
 |===
 
 == Hardware
@@ -79,5 +79,5 @@ Never overlap two large services. Delete or stop the previous InferenceService b
 | 2 GPUs (delete previous large service)
 
 | Isolation playground
-| 1+1 GPU in two projects
+| Up to 5 GPU per tenant against the 6 GPU Kueue pool (C8)
 |===
