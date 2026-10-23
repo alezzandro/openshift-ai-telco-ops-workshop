@@ -70,3 +70,55 @@ class. Do **not** time the first (cold) request.
 - Script GPU choreography (which InferenceServices to stop) so the 3-GPU
   pair does not collide with P5 / playground.
 - Time the sidecar on rehearsal before putting it on the presenter guide.
+
+## Optional: quiet operator ServiceMonitor and DNS topology events
+
+**Status:** diagnosed 2026-10-23 on the class cluster. **No workshop impact.**
+Do not change this on class day.
+
+OpenShift Events repeat two warnings that look serious and are not:
+
+### `bearerTokenFile` InvalidConfiguration
+
+User-workload Prometheus Operator rejects operator-owned `ServiceMonitor`
+objects that scrape controller HTTPS `/metrics` with `bearerTokenFile`
+(OpenShift Prometheus forbids that field). Seen on:
+
+* `openshift-nfd/nfd-controller-manager-metrics-monitor`
+* `openshift-kueue-operator/kueue-metrics`
+* `redhat-ods-applications/odh-model-controller-metrics-monitor`
+* `redhat-ods-applications/mcp-lifecycle-operator-controller-manager-metrics-monitor`
+* `openshift-opentelemetry-operator/opentelemetry-operator-metrics-monitor`
+
+Those are **controller telemetry**, not DCGM, not vLLM, not the DSCI
+collector. NFD labeling, Kueue admission, KServe, MCP Catalog, Observe
+Models (`kserve_vllm:*`), and GPU util (`DCGM_FI_DEV_GPU_UTIL` = 10 L4)
+keep working. The CSVs rewrite the same spec, so the event returns about
+every 30 minutes.
+
+Do **not** patch the ServiceMonitors (OLM / KServe / MCP / OTel / Kueue
+revert them). Do **not** set `openshift.io/cluster-monitoring: "true"` on
+those namespaces.
+
+Optional later: label the operator namespaces
+`openshift.io/user-monitoring: "false"` so user-workload Prometheus stops
+selecting them. That only quiets Events; it does not add metrics. Rehearse
+on a non-class cluster first, and do **not** put that label on tenant
+projects (`telco-*`) or `nvidia-gpu-operator` (DCGM uses cluster
+monitoring there).
+
+https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/monitoring/configuring-user-workload-monitoring
+
+### `dns-default` TopologyAwareHintsDisabled
+
+`Unable to allocate minimum required endpoints to each zone without
+exceeding overload threshold (5 endpoints, 3 zones)`.
+
+CoreDNS `dns-default` is 5/5 Ready on the **3 masters + 2 general
+workers** (zones 2 / 2 / 1). GPU nodes do not run it (GPU taint).
+Topology-aware hints cannot spread 5 endpoints across 3 zones; kube-proxy
+falls back to normal ClusterIP (`172.30.0.10`). GPU-node pods still
+resolve `kubernetes.default.svc.cluster.local`.
+
+Do **not** tolerate `dns-default` onto GPU nodes to silence this. The
+taint is intentional.
