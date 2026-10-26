@@ -38,12 +38,28 @@ jobs:
             @antora/cli@3.1.10 @antora/site-generator@3.1.10
           echo "${RUNNER_TEMP}/antora/node_modules/.bin" >> "${GITHUB_PATH}"
 
+      - name: Ensure GitHub Pages source is Actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '{build_type:.build_type,html_url:.html_url}'; then
+            echo "Pages is already configured"
+          else
+            echo "Creating Pages site (build_type=workflow)"
+            if ! gh api --method POST "repos/${GITHUB_REPOSITORY}/pages" -f build_type=workflow; then
+              echo "Could not enable GitHub Pages with GITHUB_TOKEN."
+              echo "One-time: Settings → Pages → Source = GitHub Actions, then re-run this workflow."
+              exit 1
+            fi
+          fi
+
       - name: Configure GitHub Pages
+        id: pages
         uses: actions/configure-pages@v5
 
       - name: Build Presenter and Playground
         env:
-          PAGES_BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
           PAGES_OUT: ${{ github.workspace }}/public
         run: bash lab-guide/build-github-pages.sh
 
