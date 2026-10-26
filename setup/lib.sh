@@ -809,6 +809,101 @@ PY
   done
 }
 
+# Dashboard visibility for GitOps-created connections (RHOAI 3.5):
+#   label  opendatahub.io/managed=true
+#   annotation opendatahub.io/connection-type=<ConfigMap name in redhat-ods-applications>
+# Without those, Connections show in the project list but the deploy wizard
+# has no S3 / OCI type badge and will not offer the secret. Editing the
+# connection in the UI stamps the same fields (seen on telco-ops-demo C4).
+# https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_on_projects/using-connections_projects
+ensure_s4_workshop_connections() {
+  local ns
+  if ! oc get secret s4-credentials -n "${S4_NS}" >/dev/null 2>&1; then
+    echo "  [WARN] ${S4_NS}/s4-credentials missing; skip S3 connections" >&2
+    return 0
+  fi
+  for ns in ${DS_PROJECTS}; do
+    S4_NS="${S4_NS}" S4_BUCKET="${S4_BUCKET}" S4_CONNECTION_NAME="${S4_CONNECTION_NAME}" \
+    NS="${ns}" python3 - <<'PY'
+import base64, json, os, subprocess, sys
+
+ns = os.environ["NS"]
+s4_ns = os.environ["S4_NS"]
+name = os.environ["S4_CONNECTION_NAME"]
+bucket = os.environ["S4_BUCKET"]
+endpoint = f"http://s4.{s4_ns}.svc.cluster.local:7480"
+
+def oc_json(*args):
+    return json.loads(subprocess.check_output(["oc", *args]))
+
+def decode(data, key):
+    raw = (data or {}).get(key)
+    return base64.b64decode(raw).decode() if raw else ""
+
+creds = oc_json("get", "secret", "s4-credentials", "-n", s4_ns, "-o", "json")
+access = decode(creds.get("data"), "AWS_ACCESS_KEY_ID")
+secret = decode(creds.get("data"), "AWS_SECRET_ACCESS_KEY")
+if not access or not secret:
+    print(f"  [WARN] {s4_ns}/s4-credentials missing keys; skip {ns}/{name}", file=sys.stderr)
+    sys.exit(0)
+
+doc = {
+    "apiVersion": "v1",
+    "kind": "Secret",
+    "metadata": {
+        "name": name,
+        "namespace": ns,
+        "labels": {
+            "opendatahub.io/dashboard": "true",
+            "opendatahub.io/managed": "true",
+            "workshop.opendatahub.io/component": "s4",
+        },
+        "annotations": {
+            "opendatahub.io/connection-type": "s3",
+            "opendatahub.io/connection-type-protocol": "s3",
+            "opendatahub.io/connection-type-ref": "s3",
+            "openshift.io/display-name": "S4 workshop models (demo)",
+            "openshift.io/description": (
+                "Demo-only S3 via S4. Replace with enterprise object storage "
+                "outside this lab."
+            ),
+        },
+    },
+    "type": "Opaque",
+    "stringData": {
+        "AWS_ACCESS_KEY_ID": access,
+        "AWS_SECRET_ACCESS_KEY": secret,
+        "AWS_S3_ENDPOINT": endpoint,
+        "AWS_S3_BUCKET": bucket,
+        "AWS_DEFAULT_REGION": "us-east-1",
+        "AWS_S3_VERIFY_SSL": "false",
+        "S3_USE_HTTPS": "0",
+        "AWS_HTTPS": "false",
+    },
+}
+proc = subprocess.run(
+    ["oc", "apply", "--server-side", "--force-conflicts", "-f", "-"],
+    input=json.dumps(doc).encode(),
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+)
+if proc.returncode != 0:
+    sys.stderr.write(proc.stderr.decode() or "oc apply failed\n")
+    sys.exit(proc.returncode)
+subprocess.run(
+    [
+        "oc", "annotate", "secret", name, "-n", ns,
+        "kubectl.kubernetes.io/last-applied-configuration-",
+        "--overwrite",
+    ],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+print(f"  [OK] {ns}/{name} (S3 dashboard type)", file=sys.stderr)
+PY
+  done
+}
+
 # Shared OCI-v1 connection for catalog ModelCars (C3 Ministral, C6 Phi-4, …).
 # Matching is by OCI_HOST (registry.redhat.io), not by model name. C3 used to
 # create a connection named after Ministral; C6 then locked that leftover in
@@ -819,7 +914,7 @@ ensure_redhat_catalog_oci_connections() {
     CATALOG_OCI_CONNECTION_NAME="${CATALOG_OCI_CONNECTION_NAME}" \
     CATALOG_OCI_CONNECTION_DISPLAY="${CATALOG_OCI_CONNECTION_DISPLAY}" \
     CATALOG_OCI_HOST="${CATALOG_OCI_HOST}" \
-    NS="${ns}" python3 - <<'PY' | oc apply -f -
+    NS="${ns}" python3 - <<'PY'
 import base64, json, os, subprocess, sys
 
 ns = os.environ["NS"]
@@ -855,8 +950,12 @@ doc = {
     "metadata": {
         "name": name,
         "namespace": ns,
-        "labels": {"opendatahub.io/dashboard": "true"},
+        "labels": {
+            "opendatahub.io/dashboard": "true",
+            "opendatahub.io/managed": "true",
+        },
         "annotations": {
+            "opendatahub.io/connection-type": "oci-v1",
             "opendatahub.io/connection-type-protocol": "oci",
             "opendatahub.io/connection-type-ref": "oci-v1",
             "openshift.io/display-name": display,
@@ -869,7 +968,24 @@ doc = {
         "OCI_HOST": host,
     },
 }
-print(json.dumps(doc, indent=2))
+proc = subprocess.run(
+    ["oc", "apply", "--server-side", "--force-conflicts", "-f", "-"],
+    input=json.dumps(doc).encode(),
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.PIPE,
+)
+if proc.returncode != 0:
+    sys.stderr.write(proc.stderr.decode() or "oc apply failed\n")
+    sys.exit(proc.returncode)
+subprocess.run(
+    [
+        "oc", "annotate", "secret", name, "-n", ns,
+        "kubectl.kubernetes.io/last-applied-configuration-",
+        "--overwrite",
+    ],
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
 if existing and name != want_name:
     print(f"  [OK] {ns}/{name} (renamed leftover catalog OCI connection)", file=sys.stderr)
 else:
@@ -939,6 +1055,33 @@ def default_sa_auths(namespace):
                 auths.update(cfg)
     return auths
 
+def normalize_auths(auths):
+    # OpenShift dockercfg stores username "<token>". Kubelet accepts that;
+    # KServe ModelCar / containers-image does not and returns
+    # "invalid username/password: authentication required". Use the token as
+    # the password with a dummy username, which the in-cluster registry accepts.
+    out = {}
+    for registry, entry in (auths or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        user = entry.get("username") or ""
+        password = entry.get("password") or ""
+        auth = entry.get("auth") or ""
+        if (not user or not password) and auth:
+            try:
+                decoded = base64.b64decode(auth).decode()
+            except Exception:
+                decoded = ""
+            if ":" in decoded:
+                user, password = decoded.split(":", 1)
+        if user in ("<token>", "token", "") and password:
+            user = "unused"
+        if not user or not password:
+            continue
+        token = base64.b64encode(f"{user}:{password}".encode()).decode()
+        out[registry] = {"username": user, "password": password, "auth": token}
+    return out
+
 def is_incluster_oci(secret):
     ann = secret.get("metadata", {}).get("annotations") or {}
     protocol = ann.get("opendatahub.io/connection-type-protocol")
@@ -950,7 +1093,7 @@ def is_incluster_oci(secret):
 
 def apply_secret(doc):
     proc = subprocess.run(
-        ["oc", "apply", "-f", "-"],
+        ["oc", "apply", "--server-side", "--force-conflicts", "-f", "-"],
         input=json.dumps(doc).encode(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -958,8 +1101,18 @@ def apply_secret(doc):
     if proc.returncode != 0:
         sys.stderr.write(proc.stderr.decode() or "oc apply failed\n")
         sys.exit(proc.returncode)
+    subprocess.run(
+        [
+            "oc", "annotate", "secret", doc["metadata"]["name"],
+            "-n", doc["metadata"]["namespace"],
+            "kubectl.kubernetes.io/last-applied-configuration-",
+            "--overwrite",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
-auths = default_sa_auths(ns)
+auths = normalize_auths(default_sa_auths(ns))
 if not auths:
     print(f"  [WARN] {ns}: default SA has no image pull auths; skip in-cluster OCI connection", file=sys.stderr)
     sys.exit(0)
@@ -973,8 +1126,12 @@ doc = {
     "metadata": {
         "name": want_name,
         "namespace": ns,
-        "labels": {"opendatahub.io/dashboard": "true"},
+        "labels": {
+            "opendatahub.io/dashboard": "true",
+            "opendatahub.io/managed": "true",
+        },
         "annotations": {
+            "opendatahub.io/connection-type": "oci-v1",
             "opendatahub.io/connection-type-protocol": "oci",
             "opendatahub.io/connection-type-ref": "oci-v1",
             "openshift.io/display-name": display,

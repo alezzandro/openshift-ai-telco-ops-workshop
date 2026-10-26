@@ -462,6 +462,11 @@ for secret in data.get("items") or []:
         continue
     if ann.get("openshift.io/display-name") != display:
         sys.exit(1)
+    labels = secret.get("metadata", {}).get("labels") or {}
+    if labels.get("opendatahub.io/managed") != "true":
+        sys.exit(1)
+    if ann.get("opendatahub.io/connection-type") != "oci-v1":
+        sys.exit(1)
     sys.exit(0)
 sys.exit(1)
 ' ; then
@@ -501,7 +506,17 @@ for secret in data.get("items") or []:
     auths = cfg.get("auths") if isinstance(cfg.get("auths"), dict) else {}
     if host not in auths:
         continue
+    entry = auths.get(host) or {}
+    user = entry.get("username") or ""
+    password = entry.get("password") or ""
+    if user in ("", "<token>", "token") or not password:
+        sys.exit(1)
     if ann.get("openshift.io/display-name") != display:
+        sys.exit(1)
+    labels = secret.get("metadata", {}).get("labels") or {}
+    if labels.get("opendatahub.io/managed") != "true":
+        sys.exit(1)
+    if ann.get("opendatahub.io/connection-type") != "oci-v1":
         sys.exit(1)
     sys.exit(0)
 sys.exit(1)
@@ -797,17 +812,30 @@ if oc get deploy s4 -n "${S4_NS}" &>/dev/null; then
   fi
   CONN_OK=0
   for ns in ${DS_PROJECTS}; do
-    if oc get secret "${S4_CONNECTION_NAME}" -n "${ns}" >/dev/null 2>&1; then
+    if oc get secret "${S4_CONNECTION_NAME}" -n "${ns}" -o json 2>/dev/null | python3 -c '
+import json,sys
+s=json.load(sys.stdin)
+labels=s.get("metadata",{}).get("labels") or {}
+ann=s.get("metadata",{}).get("annotations") or {}
+ok = (
+    labels.get("opendatahub.io/dashboard")=="true"
+    and labels.get("opendatahub.io/managed")=="true"
+    and ann.get("opendatahub.io/connection-type")=="s3"
+    and ann.get("opendatahub.io/connection-type-protocol")=="s3"
+    and "AWS_S3_ENDPOINT" in (s.get("data") or {})
+    and "AWS_S3_BUCKET" in (s.get("data") or {})
+)
+sys.exit(0 if ok else 1)
+' ; then
       CONN_OK=$((CONN_OK + 1))
+      pass "S3 connection ${S4_CONNECTION_NAME} in ${ns} (dashboard S3 type)"
+    else
+      fail "S3 connection ${S4_CONNECTION_NAME} in ${ns} missing dashboard S3 labels (opendatahub.io/managed + connection-type=s3)"
     fi
   done
-  if [ "${CONN_OK}" -ge 1 ]; then
-    pass "S3 connection ${S4_CONNECTION_NAME} in ${CONN_OK} Data Science Project(s)"
-  else
-    fail "S3 connection ${S4_CONNECTION_NAME} missing"
-    if [ "${FIX}" -eq 1 ]; then
-      bash "${SCRIPT_DIR}/12-deploy-s4.sh" || true
-    fi
+  if [ "${CONN_OK}" -lt 3 ] && [ "${FIX}" -eq 1 ]; then
+    echo "        Re-applying S4 workshop S3 connections..."
+    ensure_s4_workshop_connections || true
   fi
   if oc get job s4-seed -n "${S4_NS}" -o jsonpath='{.status.succeeded}' 2>/dev/null | grep -qx 1; then
     pass "C4 s4-seed Job Complete (Qwen 7B → s3://${S4_BUCKET}/${HF_C4_PREFIX}/)"

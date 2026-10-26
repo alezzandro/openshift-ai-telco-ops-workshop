@@ -82,43 +82,7 @@ fi
 
 echo "4. OpenShift AI S3 connections in Data Science Projects..."
 S4_ENDPOINT="http://s4.${S4_NS}.svc.cluster.local:7480"
-for ns in ${DS_PROJECTS}; do
-  S4_ACCESS="${S4_ACCESS}" S4_SECRET="${S4_SECRET}" S4_ENDPOINT="${S4_ENDPOINT}" \
-  S4_BUCKET="${S4_BUCKET}" S4_CONNECTION_NAME="${S4_CONNECTION_NAME}" NS="${ns}" \
-  python3 - <<'PY' | oc apply -f -
-import json, os
-ns = os.environ["NS"]
-name = os.environ["S4_CONNECTION_NAME"]
-doc = {
-  "apiVersion": "v1",
-  "kind": "Secret",
-  "metadata": {
-    "name": name,
-    "namespace": ns,
-    "labels": {"opendatahub.io/dashboard": "true", "workshop.opendatahub.io/component": "s4"},
-    "annotations": {
-      "opendatahub.io/connection-type-protocol": "s3",
-      "opendatahub.io/connection-type-ref": "s3",
-      "openshift.io/display-name": "S4 workshop models (demo)",
-      "openshift.io/description": "Demo-only S3 via S4. Replace with enterprise object storage outside this lab.",
-    },
-  },
-  "type": "Opaque",
-  "stringData": {
-    "AWS_ACCESS_KEY_ID": os.environ["S4_ACCESS"],
-    "AWS_SECRET_ACCESS_KEY": os.environ["S4_SECRET"],
-    "AWS_S3_ENDPOINT": os.environ["S4_ENDPOINT"],
-    "AWS_S3_BUCKET": os.environ["S4_BUCKET"],
-    "AWS_DEFAULT_REGION": "us-east-1",
-    "AWS_S3_VERIFY_SSL": "false",
-    "S3_USE_HTTPS": "0",
-    "AWS_HTTPS": "false",
-  },
-}
-print(json.dumps(doc, indent=2))
-PY
-  echo "  [OK] ${ns}/${S4_CONNECTION_NAME}"
-done
+ensure_s4_workshop_connections
 echo ""
 
 echo "5. C4b ModelCar BuildConfig (Granite 3.3 2B Instruct)..."

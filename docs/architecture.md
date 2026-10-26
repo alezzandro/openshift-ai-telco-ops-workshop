@@ -166,9 +166,13 @@ catalog **Deploy model** shortcut. C4 registers a Hugging Face snapshot from **S
 object storage). C4b registers a **ModelCar** OCI image built from
 `ibm-granite/granite-3.3-2b-instruct` into the in-cluster registry. The
 internal registry requires a `kubernetes.io/dockerconfigjson` OCI connection
-(`In-cluster registry`, host `image-registry.openshift-image-registry.svc:5000`);
-KServe injects that Secret as `imagePullSecrets`. Dashboard *Register and store*
-can also bake a ModelCar; this lab shows the UBI9 Containerfile instead.
+(`In-cluster registry`, host `image-registry.openshift-image-registry.svc:5000`)
+with username/password (not OpenShift's dockercfg `<token>` username).
+KServe ModelCar injects that Secret as `imagePullSecrets`. GitOps connections
+also need `opendatahub.io/managed=true` and `opendatahub.io/connection-type`
+or the dashboard deploy wizard hides the S3/OCI type badge.
+Dashboard *Register and store* can also bake a ModelCar; this lab shows the
+UBI9 Containerfile instead.
 
 Docs: [Working with model registries](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_model_registries/index),
 [Register a model from the model catalog](https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_the_model_catalog/index).
