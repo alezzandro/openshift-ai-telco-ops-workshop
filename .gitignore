@@ -23,8 +23,11 @@ venv/
 # Container / Antora build artifacts
 context/
 lab-guide/www/
+lab-guide/.cache/
+lab-guide/ui-bundle.zip
 content/www/
 www/
+/public/
 
 # Cursor
 .cursor/

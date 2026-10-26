@@ -1,0 +1,64 @@
+# Public Antora copies of the Presenter and Playground guides.
+# Class still uses the in-cluster Routes (lab-guide / playground).
+name: Publish lab guides to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - content/**
+      - lab-guide/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Antora 3.1.10
+        run: |
+          npm install --omit=dev --prefix "${RUNNER_TEMP}/antora" \
+            @antora/cli@3.1.10 @antora/site-generator@3.1.10
+          echo "${RUNNER_TEMP}/antora/node_modules/.bin" >> "${GITHUB_PATH}"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build Presenter and Playground
+        env:
+          PAGES_BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+          PAGES_OUT: ${{ github.workspace }}/public
+        run: bash lab-guide/build-github-pages.sh
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

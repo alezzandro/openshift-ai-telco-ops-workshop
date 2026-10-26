@@ -130,6 +130,17 @@ Content is authored as Antora AsciiDoc in `content/` and served from a UBI9
 httpd Deployment on the cluster. After any `content/` or `lab-guide/` edit,
 rebuild with `./setup/11-deploy-lab-guide.sh` so the live Routes pick it up.
 
+Public, cluster-free copies of the same AsciiDoc are on GitHub Pages (no live
+console, OpenShift AI, Open WebUI, or S4 URLs):
+
+- Landing: https://alezzandro.github.io/openshift-ai-telco-ops-workshop/
+- Presenter: https://alezzandro.github.io/openshift-ai-telco-ops-workshop/presenter/
+- Playground: https://alezzandro.github.io/openshift-ai-telco-ops-workshop/playground/
+
+Pages updates on push to `main` (`content/` or `lab-guide/`). That does **not**
+replace the in-cluster rebuild. One-time GitHub setting: **Settings → Pages →
+Source = GitHub Actions**. The workflow is `.github/workflows/pages.yml`.
+
 Open WebUI is a **documented demo exception**: there is no UBI equivalent, so
 the lab pins `ghcr.io/open-webui/open-webui:v0.6.36` (never `:main`) and grants
 the `anyuid` SCC. It is presenter-only. Students call the authenticated model

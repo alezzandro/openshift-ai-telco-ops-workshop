@@ -49,7 +49,7 @@ OpenShift AI **Observe & monitor → Dashboard → Models** (not **Infrastructur
 
 == P2. Hugging Face model from S3
 
-Setup imported `Qwen/Qwen2.5-7B-Instruct` into the demo S4 bucket. Your project already has connection **S4 workshop models (demo)**.
+Setup imported `Qwen/Qwen2.5-7B-Instruct` into the demo S4 bucket. Your project already has connection **S4 workshop models (demo)** (type **S3 compatible object storage - v1**).
 
 . **AI hub → Registry** → **Register model**. Location: **Object storage**, connection **S4 workshop models (demo)**, path `qwen2.5-7b-instruct`. Format `vLLM`, version `hf`.
 . Deploy into *your* project with *NVIDIA L4 - 1 GPU*, **Model access**, token auth (`workshop-infer`), `--max-model-len=8192`.

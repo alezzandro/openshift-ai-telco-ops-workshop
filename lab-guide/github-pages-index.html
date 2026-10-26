@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenShift AI telco ops workshop</title>
+  <style>
+    :root { --rh-red: #ee0000; --ink: #151515; --muted: #6a6e73; --bg: #f5f5f5; --card: #ffffff; --border: #d2d2d2; --link: #0066cc; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: "Red Hat Text", "Noto Sans", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.55; }
+    .header { background: var(--ink); color: #fff; }
+    .header-inner { max-width: 800px; margin: 0 auto; padding: 0.85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; }
+    .logo { color: #fff; text-decoration: none; font-weight: 600; }
+    .header-note { color: #f0f0f0; font-size: 0.85rem; }
+    main { max-width: 800px; margin: 2rem auto; padding: 0 1.25rem 3rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1.25rem 1.5rem; margin: 1rem 0; }
+    a { color: var(--link); }
+    .note { background: #e7f1fa; border-left: 4px solid var(--link); padding: 0.75rem 1rem; }
+    .actions { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+    .actions a { display: block; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1.25rem; text-decoration: none; color: var(--ink); }
+    .actions a:hover { border-color: var(--rh-red); }
+    .actions strong { display: block; color: var(--rh-red); margin-bottom: 0.35rem; }
+    @media (max-width: 640px) { .actions { grid-template-columns: 1fr; } }
+    footer { text-align: center; font-size: 0.8rem; color: var(--muted); padding: 1rem; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <a class="logo" href="./">OpenShift AI telco ops workshop</a>
+      <span class="header-note">Red Hat OpenShift AI 3.5</span>
+    </div>
+  </header>
+  <main>
+    <h1>Lab guides</h1>
+    <p>Public copies of the workshop AsciiDoc. Official product names: Red Hat OpenShift, Red Hat OpenShift AI.</p>
+    <div class="actions">
+      <a href="presenter/">
+        <strong>Presenter guide</strong>
+        Facilitator click-path (C1–C8, C3b, TELCO).
+      </a>
+      <a href="playground/">
+        <strong>Playground</strong>
+        Student rules and exercises P1–P10.
+      </a>
+    </div>
+    <p class="note">Live class URLs (OpenShift console, OpenShift AI dashboard, Open WebUI, S4) are on the in-cluster Routes, not on GitHub Pages. This site is a cluster-free showcase.</p>
+  </main>
+  <footer>Public workshop content. Class still uses the in-cluster lab-guide and playground Routes.</footer>
+</body>
+</html>

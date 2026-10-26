@@ -1,7 +1,11 @@
 (function () {
   const el = document.getElementById("env-banner");
   if (!el) return;
-  const playground = (location.hostname || "").indexOf("playground-") === 0;
+  const host = location.hostname || "";
+  const path = location.pathname || "";
+  // In-cluster Playground Route is playground-*. GitHub Pages uses /playground/.
+  const playground =
+    host.indexOf("playground-") === 0 || /(^|\/)playground(\/|$)/.test(path);
   const note = document.querySelector(".header-note");
   if (note) {
     note.textContent = playground

@@ -43,7 +43,7 @@ Talking point: "In a customer environment this UI is the bucket console on OpenS
 == 2. Connection (already created)
 
 . OpenShift AI → project `{presenter_project}` → **Connections**.
-. Confirm **S4 workshop models (demo)**: S3 compatible object storage, endpoint `http://s4.s4.svc.cluster.local:7480`, bucket `models`.
+. Confirm **S4 workshop models (demo)** shows type **S3 compatible object storage - v1** (not a generic secret). Endpoint `http://s4.s4.svc.cluster.local:7480`, bucket `models`. Setup stamps `opendatahub.io/managed=true` and `opendatahub.io/connection-type=s3` so the deploy wizard can select it — do not edit the connection on stage.
 . Students have the same connection in `{ran_project}` and `{core_project}`.
 
 https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5/html/working_with_data_in_an_s3-compatible_object_store/index[Working with data in an S3-compatible object store]
